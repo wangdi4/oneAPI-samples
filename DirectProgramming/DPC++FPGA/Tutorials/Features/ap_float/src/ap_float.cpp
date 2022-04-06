@@ -30,7 +30,9 @@ class ConversionKernelC;
 class SimpleQuadraticEqnSolverKernel;
 class SpecializedQuadraticEqnSolverKernel;
 
+// The number of terms in the polynomial approximation of the sine function
 constexpr int kSineApproximateTermsCount = 10;
+
 constexpr double kSineApproximationEpsilon = 1e-13;
 
 // ap_float< 8,23> has the same number of exponent and mantissa bits as native
@@ -58,8 +60,10 @@ constexpr auto kRoundingModeRNE = ihc::fp_config::FP_Round::RNE;
 // Polynomial Sine Approximation example
 // -------------------------------------------------------------------------- //
 
+// The function template to generate sine-approximation kernels with different
+// floating data types
 template <typename T, class KernelTag>
-void RunSineApproximationKernel(queue &q, const T &input, T &output) {
+void SineApproximationKernel(queue &q, const T &input, T &output) {
   buffer<T, 1> inp_buffer(&input, 1);
   buffer<T, 1> res_buffer(&output, 1);
 
@@ -87,7 +91,7 @@ void RunSineApproximationKernel(queue &q, const T &input, T &output) {
   });
 }
 
-void TestSineApproximation(queue &q) {
+bool TestSineApproximation(queue &q) {
   bool passed_native = false, passed_non_native = false;
 
   std::cout << "Testing basic arithmetic operators to approximate the sine "
@@ -99,8 +103,8 @@ void TestSineApproximation(queue &q) {
   double double_result;
 
   // Approximate with native double type
-  RunSineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
-                                                                double_result);
+  SineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
+                                                             double_result);
 
   // Approximate with ap_float type
   // We set the rounding mode to RZERO (truncate to zero) because this allows us
@@ -111,7 +115,7 @@ void TestSineApproximation(queue &q) {
   APDoubleTypeC ap_float_input = (APDoubleTypeC)input;
   APDoubleTypeC ap_float_result;
 
-  RunSineApproximationKernel<APDoubleTypeC, ApproximateSineWithAPFloat>(
+  SineApproximationKernel<APDoubleTypeC, ApproximateSineWithAPFloat>(
       q, ap_float_input, ap_float_result);
 
   double difference_a = std::abs(double_result - expected);
@@ -136,10 +140,13 @@ void TestSineApproximation(queue &q) {
   passed_native = (difference_a < kSineApproximationEpsilon);
   passed_non_native = (difference_b < kSineApproximationEpsilon);
 
+  std::cout << "\nSine Approximation: ";
   if (passed_native && passed_non_native) {
-    std::cout << "\nPASSED\n\n";
+    std::cout << "PASSED\n\n";
+    return true;
   } else {
-    std::cout << "\nFAILED\n\n";
+    std::cout << "FAILED\n\n";
+    return false;
   }
 }
 
@@ -160,8 +167,8 @@ void TestConversionKernelA(queue &q, const APFloatType &num,
     accessor res_accessor{res_buffer, h, write_only, no_init};
 
     h.single_task<ConversionKernelA>([=] {
-      // This is a direct bitcast: x and y will be compile time constants and
-      // hence no cast operation will be generated for it.
+      // x and y will be compile time constants and hence no cast operation will
+      // be generated for it.
       const APFloatType x = 3.1f;
       const APDoubleType y = 4.1;
 
@@ -279,7 +286,7 @@ bool RunSpecifiedConversionKernel(queue &q,
   return difference < kConversionKernelEpsilon;
 }
 
-void TestAllConversionKernels(queue &q) {
+bool TestAllConversionKernels(queue &q) {
   std::cout << "Testing conversions in ap_float\n";
   bool passed_A = RunSpecifiedConversionKernel<APFloatType, APDoubleType>(
       q, TestConversionKernelA);
@@ -293,10 +300,13 @@ void TestAllConversionKernels(queue &q) {
   bool passed_C = RunSpecifiedConversionKernel<APFloatType, APDoubleType>(
       q, TestConversionKernelC);
 
+  std::cout << "Conversion: ";
   if (passed_A && passed_B && passed_C) {
     std::cout << "PASSED\n\n";
+    return true;
   } else {
     std::cout << "FAILED\n\n";
+    return false;
   }
 }
 
@@ -421,10 +431,10 @@ void TestSpecializedQuadraticEqnSolver(queue &q, const float A, const float B,
   r = std::make_pair(root1, root2);
 }
 
-bool TestQuadraticEqnSolverKernels(queue &q,
-                                   void (*func)(queue &, const float,
-                                                const float, const float,
-                                                PairAPDoubleType &)) {
+bool RunSpecifiedQuadraticEqnSolverKernel(queue &q,
+                                          void (*func)(queue &, const float,
+                                                       const float, const float,
+                                                       PairAPDoubleType &)) {
   constexpr double kQuadraticEqnEpsilon = 1e-6;
   constexpr size_t kQuadraticTestsCount = 3;
 
@@ -480,17 +490,21 @@ bool TestQuadraticEqnSolverKernels(queue &q,
   return passed;
 }
 
-void TestQuadraticEquationSolverKernels(queue &q) {
+bool TestQuadraticEquationSolverKernels(queue &q) {
   std::cout << "Calculating quadratic equation in higher precision\n";
-  auto test_a = TestQuadraticEqnSolverKernels(q, TestSimpleQuadraticEqnSolver);
+  auto test_a =
+      RunSpecifiedQuadraticEqnSolverKernel(q, TestSimpleQuadraticEqnSolver);
   std::cout << "\nCalculating quadratic equation with the optimized kernel\n";
-  auto test_b =
-      TestQuadraticEqnSolverKernels(q, TestSpecializedQuadraticEqnSolver);
+  auto test_b = RunSpecifiedQuadraticEqnSolverKernel(
+      q, TestSpecializedQuadraticEqnSolver);
 
+  std::cout << "\nQuadratic Equation Solving: ";
   if (test_a && test_b) {
-    std::cout << "\nPASSED\n";
+    std::cout << "PASSED\n";
+    return true;
   } else {
-    std::cout << "\nFAILED\n";
+    std::cout << "FAILED\n";
+    return false;
   }
 }
 
@@ -501,13 +515,15 @@ int main() {
   ext::intel::fpga_selector selector;
 #endif
 
+  bool passed = true;
+
   try {
     // Create the SYCL device queue
     queue q(selector, dpc_common::exception_handler);
 
-    TestSineApproximation(q);
-    TestAllConversionKernels(q);
-    TestQuadraticEquationSolverKernels(q);
+    passed &= TestSineApproximation(q);
+    passed &= TestAllConversionKernels(q);
+    passed &= TestQuadraticEquationSolverKernels(q);
 
   } catch (sycl::exception const &e) {
     // Catches exceptions in the host code
@@ -522,6 +538,12 @@ int main() {
                    "-DFPGA_EMULATOR.\n";
     }
     std::terminate();
+  }
+
+  if (passed) {
+    std::cout << "\nPASSED: all kernel results are correct.\n\n";
+  } else {
+    std::cout << "\nFAILED\n\n";
   }
 
   return 0;

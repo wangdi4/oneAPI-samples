@@ -1,4 +1,4 @@
-# Using the Algorithmic C Fixed Point data type 'ap_float'
+# Using the Algorithmic C Fixed Point Data Type 'ap_float'
 
 This FPGA tutorial demonstrates how to use the Algorithmic C (AC) data type `ap_float` and some best practices.
 
@@ -18,13 +18,13 @@ The [oneAPI Programming Guide](https://software.intel.com/en-us/oneapi-programmi
 
 This FPGA tutorial shows how to use the `ap_float` type with some simple examples and recommended best practices.
 
-This data-type can be used in place of native floating point types to generate area efficient and optimized designs for the FPGA. For example, operations which do not utilize all of the bits the native types or desings which do not require all of the range and precision of native types are good candidates for replacement with the `ap_float` type.
+This data-type can be used in place of native floating point types to generate area efficient and optimized designs for the FPGA. For example, operations which do not utilize all the bits of the native types or designs which do not require all of the range and precision of native types are good candidates for replacement with the `ap_float` type.
 
 This tutorial will present the following:
 1. How to include the `ap_float` type and an overview of common `ap_float` use cases.
 2. A Polynomial Sine Approximation example which illustrates how to trade off mathematical accuracy for lesser FPGA resource utilization.
 3. Rounding Mode and native type to `ap_float` type conversion examples which describe various `ap_float` rounding modes and their effect on accuracy and FPGA resource utilization.
-4. A Quadratic Equation Solver example which show cases explicit `ap_float` math functions and how they can be used to replace mathematical operators like `*, /, +` and `-` for better quality of results.
+4. A Quadratic Equation Solver example which showcases explicit `ap_float` math functions and how they can be used to replace mathematical operators like `*, /, +` and `-` for better quality of results.
 
 ## Simple Code Example
 
@@ -33,7 +33,7 @@ An `ap_float` number can be defined as follows:
 ```cpp
 ihc::ap_float<EW, MW> a;
 ```
-Here `EW` specifies the exponent width and `MW` specifies the mantissa width of the number. Optionally, another template parameter can be specified to set the rounding mode. For more details please refer to the section titled `Variable-Precision Integer and Floating-Point Support` in the Intel® oneAPI DPC++ FPGA Optimization Guide.
+Here `EW` specifies the exponent width and `MW` specifies the mantissa width of the number. Optionally, another template parameter can be specified to set the rounding mode. For more details please refer to the section [*Declare the ap_float Data Type*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/declare-and-use-the-ac-data-types/declare-the-ap-float-data-type.html) in the Intel® oneAPI DPC++ FPGA Optimization Guide.
 
 To use this type in your code, you must include the following header:
 
@@ -47,13 +47,13 @@ To use `ap_float` math functions, you must include the following header:
 #include <sycl/ext/intel/ac_types/ap_float_math.hpp>
 ```
 
-Additionally, you must use the flag `-qactypes` (Linux) / `/Qactypes` (Windows) in order to ensure that the headers are correctly included and that the compiler links against the necessary libraries for emulation support. Specify the flag to `dpcpp` if you are invoking `dpcpp` on the command line. The `CMake` file provided with this tutorial will do so automatically.
+Additionally, you must pass the flag `-qactypes` (Linux) / `/Qactypes` (Windows) to the `dpcpp` command when compiling your SYCL program in order to ensure that the headers are correctly included. Specify the flag to `dpcpp` if you are invoking `dpcpp` on the command line. The `CMake` file provided with this tutorial will do so automatically.
 
 You can easily convert your existing designs that use native floating-point types to use `ap_float`: simply switch the original type. For math functions, `ap_float` has the "ihc_" prefix, you can simply switch your math functions accordingly, e.g. `sin(x)` should be changed to `ihc_sin(x)` for `ap_float`.
 
 After the migration, you can use the area report to examine the area improvement of your design. In general, the line structure of the area report does not change. For example, instead of seeing a `X bit floating-point multiply` on the old design, the source line for the changed design would show `fpga.vpfp.mul`. 
 
-You should confirm that the area used for the operation has indeed decreased from a Quartus compile. You should also make sure that the result of your design still meets your accuracy expectations through simulation.
+You should confirm that the area used for the operation has indeed decreased from a Quartus compile. 
 
 ## Overview of Common Use Cases for `ap_float`
 
@@ -67,22 +67,23 @@ Finally, the various rounding modes offered along with the `ap_float` type can h
 
 ## Trading Off Mathematical Accuracy for Better Resource Utilization
 
-The kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat` implement a simple polynomial approximation of the sine function. 
+Two kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`, instantiated from the template function `RunSineApproximationKernel()`, implement a simple polynomial approximation of the sine function with single and double precision respectively. 
 
 The former uses `double` type to do so and the latter uses an `ap_float<11,44, Rnd>`. The `Rnd` rounding mode rounds towards zero. These two kernels will illustrate how to trade off accuracy for lesser FPGA resource utilization.
 
-See the section `Examining the Reports` to go over the differences in resource utilization between these kernels. See the section `Example of Output` to see the difference in accuracy of results produced by these kernels.
+See the section *Examining the Reports* to go over the differences in resource utilization between these kernels. See the section *Example of Output* to see the difference in accuracy of results produced by these kernels.
 
 Note how the kernel function within `RunSineApproximationKernel()` has been written once and the individual kernels are only differentiated by their input/output data types: `ApproximateSineWithDouble` uses `double` data type and `ApproximateSineWithAPFLoat` uses `ap_float` data type.
 
 ```cpp
-// Approximate with native double type
+// Approximate sine with native double type
 RunSineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
                                                               double_result);
 ...
 constexpr auto Rnd = ihc::fp_config::FP_Round::RZERO;
 using ap_float_double = ihc::ap_float<11, 44, Rnd>;
 
+// Approximate sine with `ap_float` type
 RunSineApproximationKernel<ap_float_double, ApproximateSineWithAPFloat>(
     q, ap_float_input, ap_float_result);
 ```
@@ -101,11 +102,11 @@ It is important to understand when the intermediate conversions can occur. Conve
 
 There are a few ways to generate compile-time `ap_float` constants that do not require any hardware implementation:
  
-  1. Initializing `ap_float<8,23>` from `float` or `ap_float<11,52>` from `double` is just a direct bitwise copy (wires in RTL), so if the input `float`/`double` is a compile-time constant, the constructed `ap_float` is also a compile-time constant. You may want to extend these two types instead of the native `float` and `double` type if you want to use `ap_float` specific floating-point arithmetic controls (for example, the explicit binary operation presented in the section titled `ap_float_explicit_arithmetic`).
+  1. Initializing `ap_float<8,23>` from `float` or `ap_float<11,52>` from `double` is just a direct bitwise copy (wires in RTL), so if the input `float`/`double` is a compile-time constant, the constructed `ap_float` is also a compile-time constant. You may want to extend these two types instead of the native `float` and `double` type if you want to use `ap_float` specific floating-point arithmetic controls (for example, the explicit binary operation presented in the section titled *ap_float_explicit_arithmetic*).
  
   2. Converting from a constant to another `ap_float` that has rounding mode `FP_Round::ZERO` also results in a compile time constant. This rounding mode is also respected in a binary operation when promotion rounding is required. This is demonstrated by the kernel code in the function `TestConversionKernelB()`.
 
-  3. The `convert_to` method of an `ap_float` returns itself rounded to a different type, it accepts a rounding mode as either accurate and area-intensive `RNE` mode (rounds to nearest, tie breaks to even) or inaccurate and non area-intensive `RZERO` (truncate towards zero) mode. When using `RZERO`, the compiler will also be able to convert a constant at compile time. This conversion bypasses the original rounding mode of the `ap_float` type. It is demonstrated by the code in `ConversionKernelC`.
+  3. The `convert_to` method of an `ap_float` returns itself rounded to a different type, it accepts a rounding mode as either accurate and area-intensive `RNE` mode (rounds to nearest, tie breaks to even) or inaccurate and non area-intensive `RZERO` (truncate towards zero) mode. When using `RZERO`, the compiler will also be able to convert a constant at compile time. This conversion bypasses the original rounding mode of the `ap_float` type. It is demonstrated by the code in the function `TestConversionKernelC`.
 
 The kernel code in this tutorial contains comments that describe which operations result in generation of explicit cast operations and which do not.
 
@@ -118,32 +119,12 @@ Note:
 
 In C++ applications, the basic binary operations have little expressiveness. On the contrary, FPGAs implement these operations using configurable logic, so you can improve your design's performance by fine-tuning the floating-point operations since they are usually area and latency intensive.
 
-The kernel code in the function `TestSpecializedQuadraticEqnSolver()` demonstrates how to use the explicit versions of `ap_float` binary operators to perform floating-point arithmetic operations based on your need.
-
-You can fine-tune the floating-point arithmetic operations when you are multiplying numbers with different precisions and/or outputting the
-result of the multiply with a different precision.
-
-You may also want to fine-tune arithmetic operations when you are not concerned about the accuracy of the operation, or when you expect your values to easily fall into the subnormal range and you do not wish to flush them to zero when that happens.
+The general form of explicit operations provided in the `ap_float` math functions are as follows:
  
-To address these use cases, `ap_float` provides an explicit version of binary operators using template functions. The explicit operators provide 3 more main features in addition to basic binary operators.
- 
-1. Allow inputs and outputs with different precisions in the multiplication.
-
-2. Tweak the area and accuracy trade off of the binary operations.
-
-    The binary operations have high accuracy by default and produce results that are 0.5 ULP off from the most correct result. Users can override the default to choose an implementation with less area but also less precision (1 ULP).
-
-3. Turn on/off subnormal support in the binary operations.
-
-    To save area, subnormal support in the binary operators default to auto, this means it would be off unless there is direct hardened DSP support for it. Users can turn it on when the computation is expected to produce values close to 0, with some additional area.
-
-The general form of explicit operations are as follows:
- 
-For addition, subtraction and division:
-Syntax:
+For addition, subtraction and division, the syntax is:
 
 ```
-  ap_float<E, M>::add/sub/div<AccuracyOption, SubnormalOption>(op1, op2)
+  ihc::ap_float<E, M>::add/sub/div<AccuracyOption, SubnormalOption>(op1, op2)
 ```
 
 Usage:
@@ -152,11 +133,10 @@ Usage:
 * Implements the operation with the provided accuracy and subnormal options.
 * Returns the result with type `ap_float<E, M>`
  
-For multiplication:
-Syntax:
+For multiplication, the syntax is:
 
 ```
-  ap_float<E, M>::mul<AccuracyOption, SubnormalOption>(op1, op2)
+  ihc::ap_float<E, M>::mul<AccuracyOption, SubnormalOption>(op1, op2)
 ```
 
 Usage:
@@ -180,22 +160,41 @@ The subnormal setting is optional can be one of the `enum`s below:
 Note:
 * Both `enum`s need to be compile time constants.
 * You must specify the accuracy setting if you want to specify the subnormal setting.
+
+The kernel code in the function `TestSpecializedQuadraticEqnSolver()` demonstrates how to use the explicit versions of `ap_float` binary operators to perform floating-point arithmetic operations based on your need.
+
+You can fine-tune the floating-point arithmetic operations when you are multiplying numbers with different precisions and/or outputting the
+result of the multiply with a different precision.
+
+You may also want to fine-tune arithmetic operations when you are not concerned about the accuracy of the operation, or when you expect your values to easily fall into the subnormal range and you do not wish to flush them to zero when that happens.
  
+To address these use cases, `ap_float` provides an explicit version of binary operators using template functions. The explicit operators provide 3 more main features in addition to basic binary operators.
+ 
+1. Allow inputs and outputs with different precisions in the multiplication.
+
+2. Tweak the area and accuracy trade off of the binary operations.
+
+    The binary operations have high accuracy by default and produce results that are 0.5 ULP off from the most correct result. Users can override the default to choose an implementation with less area but also less precision (1 ULP).
+
+3. Turn on/off subnormal support in the binary operations.
+
+    To save area, subnormal support in the binary operators default to auto, this means it would be off unless there is direct hardened DSP support for it. Users can turn it on when the computation is expected to produce values close to 0, with some additional area.
+
 After fine-tuning the operations, the overall structure of the area report would remain the same, but for each of the fine-tuned operation, you should see an area reduction on the same line if you have chosen to use the low accuracy variant of the operation, or an area increase if you decide to enable subnormal support on an operation.
 
 ### Code Example
-This section of the tutorial corresponds to the kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel`.
+This section of the tutorial corresponds to the functions `TestSimpleQuadraticEqnSolver` and `TestSpecializedQuadraticEqnSolver`, which contain the kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel` respectively.
  
 `SimpleQuadraticEqnSolverKernel` demonstrates a design that uses `ap_float` with arithmetic operators to compute the quadratic formula.
 
 After you have successfully compiled the design, open 
-"part1_operator.prj/reports/report.html " and open the Area Analysis page.
+"ap_float_report.prj/reports/report.html " and open the Area Analysis page.
 Make sure you understand the resource utilization from each operation as we
 will compare the data to the second part of the tutorial.
  
 `SpecializedQuadraticEqnSolverKernel` implements the same design but with the explicit `ap_float` math functions instead of the binary operators. Please refer to the comments in the code to understand how each operation has been tweaked.
 
-See the section `Examining the reports for the Quadratic Equation Solver Kernels` below to know more about what to look for in the reports.
+See the section *Examining the reports for the Quadratic Equation Solver Kernels* below to know more about what to look for in the reports.
 
 ## Key Concepts
 * `ap_float` can be used to improve the quality of results on the FPGA by leveraging various features like arbitrary precision, rounding modes, and explicit math functions.
@@ -329,11 +328,6 @@ operations use lesser resources for the `ApproximateSineWithAPFloat` kernel.
 
 You should observe an area reduction in resource utilization of up to 30% for the binary operations.
 
-TODO: Is simulation supported for customers yet?
-Open the "Throughput Analysis > Verification Statistics" page. You should observe around 15% percent latency reduction when using the `ap_float` type.
-
-You should also note that simulations indicate that the values computed for both designs are the same. This indicates that our original precision expectation is still satisfied.
-
 ### Examining the Reports for Conversion Kernels
 
 You can find the usages of conversion in both the area report and the graph viewer. The name of the rounding block is "cast".
@@ -383,7 +377,7 @@ Let's look at the reports and analyze each kernel in the tutorial.
 
 ### Examining the Reports for the Quadratic Equation Solver Kernels
 
-Navigate to the "Area Analysis of System" report under the "Area Analysis" tab and expand the "Kernel System" section. Observe the differences in area utilization for the two kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel`. You should observe a decrease in area of the multiplier in the calculation of `b*b - 4*a*c` at their corresponding line numbers.
+Navigate to the "Area Analysis of System" report under the "Area Analysis" tab and expand the *Kernel System* section. Observe the differences in area utilization for the two kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel`. You should observe a decrease in area of the multiplier in the calculation of `b*b - 4*a*c` at their corresponding line numbers.
 
 You should also observe a significant area estimation reduction of the divider from changing it to the low accuracy mode in the report. Also note that the area increase of the subtraction as we enable the subnormal support.
 
