@@ -31,9 +31,11 @@ This tutorial will present the following:
 An `ap_float` number can be defined as follows:
 
 ```cpp
-ihc::ap_float<EW, MW> a;
+ihc::ap_float<E, M> a;
 ```
-Here `EW` specifies the exponent width and `MW` specifies the mantissa width of the number. Optionally, another template parameter can be specified to set the rounding mode. For more details please refer to the section [*Declare the ap_float Data Type*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/declare-and-use-the-ac-data-types/declare-the-ap-float-data-type.html) in the Intel® oneAPI DPC++ FPGA Optimization Guide.
+which consists of `E+M+1` bits: one sign bit, `E` exponent bits and `M` mantissa bits. For example, `ap_float<8,23>` has the same number of exponent and mantissa bits as native `float`, and `ap_float<11,52>` has the same number of exponent and mantissa bits as native `double`.
+
+Optionally, another template parameter can be specified to set the rounding mode. For more details please refer to the section [*Declare the ap_float Data Type*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/declare-and-use-the-ac-data-types/declare-the-ap-float-data-type.html) in the Intel® oneAPI DPC++ FPGA Optimization Guide.
 
 To use this type in your code, you must include the following header:
 
@@ -102,7 +104,7 @@ It is important to understand when the intermediate conversions can occur. Conve
 
 There are a few ways to generate compile-time `ap_float` constants that do not require any hardware implementation:
  
-  1. Initializing `ap_float<8,23>` from `float` or `ap_float<11,52>` from `double` is just a direct bitwise copy (wires in RTL), so if the input `float`/`double` is a compile-time constant, the constructed `ap_float` is also a compile-time constant. You may want to extend these two types instead of the native `float` and `double` type if you want to use `ap_float` specific floating-point arithmetic controls (for example, the explicit binary operation presented in the section titled *ap_float_explicit_arithmetic*).
+  1. Initializing `ap_float<8,23>` from `float` or `ap_float<11,52>` from `double` is just a direct bitwise copy (wires in RTL), so if the input `float`/`double` is a compile-time constant, the constructed `ap_float` is also a compile-time constant. You may want to extend these two types instead of the native `float` and `double` type if you want to use `ap_float` specific floating-point arithmetic controls (for example, the explicit binary operation presented in the next section *Using Explicit `ap_float` Math Functions in Place of Mathematical Operators*).
  
   2. Converting from a constant to another `ap_float` that has rounding mode `FP_Round::ZERO` also results in a compile time constant. This rounding mode is also respected in a binary operation when promotion rounding is required. This is demonstrated by the kernel code in the function `TestConversionKernelB()`.
 
@@ -186,15 +188,10 @@ After fine-tuning the operations, the overall structure of the area report would
 This section of the tutorial corresponds to the functions `TestSimpleQuadraticEqnSolver` and `TestSpecializedQuadraticEqnSolver`, which contain the kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel` respectively.
  
 `SimpleQuadraticEqnSolverKernel` demonstrates a design that uses `ap_float` with arithmetic operators to compute the quadratic formula.
-
-After you have successfully compiled the design, open 
-"ap_float_report.prj/reports/report.html " and open the Area Analysis page.
-Make sure you understand the resource utilization from each operation as we
-will compare the data to the second part of the tutorial.
  
 `SpecializedQuadraticEqnSolverKernel` implements the same design but with the explicit `ap_float` math functions instead of the binary operators. Please refer to the comments in the code to understand how each operation has been tweaked.
 
-See the section *Examining the reports for the Quadratic Equation Solver Kernels* below to know more about what to look for in the reports.
+To compare the resource utilization between arithmetic operators and explicit math functions, see the section *Examining the reports for the Quadratic Equation Solver Kernels* below to know more about what to look for in the reports.
 
 ## Key Concepts
 * `ap_float` can be used to improve the quality of results on the FPGA by leveraging various features like arbitrary precision, rounding modes, and explicit math functions.
@@ -319,7 +316,7 @@ Locate the pair of `report.html` files in either:
 
 ### Examining the Area Reports for the Sine Approximation Kernels
 
-Navigate to the "Area Analysis-> Area Analysis of System" page. Click on the `Kernel System` line to expand it.
+Navigate to the *Area Estimates* page. Click on the *Kernel System* line to expand it.
 
 Observe the difference in resource utilization of the kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`.
 
@@ -361,10 +358,8 @@ Let's look at the reports and analyze each kernel in the tutorial.
 
   The other cast node is represented by a combination of `shift`, `select`, and `and` operations hence only one node labeled as "cast" is visible in the reports.
   
-  The reduction in the number of cast nodes as compared to `ConversionKernelA` results in reduction of hardware resources used by `ConversionKernelB`.
+  Similarly, the reduction in the number of cast nodes as compared to `ConversionKernelA` results in reduction of hardware resources used by `ConversionKernelC`.
   
-  Observe the differences in the resource usage of these two kernels by navigating to the *Area Analysis of System* report (*Area Analysis* > *Area Analysis of System*) and looking at the entries under `Kernel System`.
-
 2. Kernel: `ConversionKernelC`
   This kernel shows how to use the `convert_to` function and modify the rounding mode for a specific operation.
 
@@ -375,9 +370,10 @@ Let's look at the reports and analyze each kernel in the tutorial.
               z.convert_to<11, 52, RndZ>(); 
   ```
 
+
 ### Examining the Reports for the Quadratic Equation Solver Kernels
 
-Navigate to the "Area Analysis of System" report under the "Area Analysis" tab and expand the *Kernel System* section. Observe the differences in area utilization for the two kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel`. You should observe a decrease in area of the multiplier in the calculation of `b*b - 4*a*c` at their corresponding line numbers.
+Navigate to the *Area Estimates* report and expand the *Kernel System* section. Observe the differences in area utilization for the two kernels `SimpleQuadraticEqnSolverKernel` and `SpecializedQuadraticEqnSolverKernel`. You should observe a decrease in area of the multiplier in the calculation of `b*b - 4*a*c` at their corresponding line numbers.
 
 You should also observe a significant area estimation reduction of the divider from changing it to the low accuracy mode in the report. Also note that the area increase of the subtraction as we enable the subnormal support.
 
