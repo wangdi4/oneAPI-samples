@@ -22,9 +22,8 @@ This data-type can be used in place of native floating point types to generate a
 
 This tutorial will present the following:
 1. How to include the `ap_float` type and an overview of common `ap_float` use cases.
-2. A Polynomial Sine Approximation example which illustrates how to trade off mathematical accuracy for lesser FPGA resource utilization.
-3. Rounding Mode and native type to `ap_float` type conversion examples which describe various `ap_float` rounding modes and their effect on accuracy and FPGA resource utilization.
-4. A Quadratic Equation Solver example which showcases explicit `ap_float` math functions and how they can be used to replace mathematical operators like `*, /, +` and `-` for better quality of results.
+2. Rounding Mode and native type to `ap_float` type conversion examples which describe various `ap_float` rounding modes and their effect on accuracy and FPGA resource utilization.
+3. A Quadratic Equation Solver example which showcases explicit `ap_float` math functions and how they can be used to replace mathematical operators like `*, /, +` and `-` for better quality of results.
 
 ## Simple Code Example
 
@@ -53,44 +52,13 @@ Additionally, you must pass the flag `-qactypes` (Linux) / `/Qactypes` (Windows)
 
 You can easily convert your existing designs that use native floating-point types to use `ap_float`: simply switch the original type. For math functions, `ap_float` has the "ihc_" prefix, you can simply switch your math functions accordingly, e.g. `sin(x)` should be changed to `ihc_sin(x)` for `ap_float`.
 
-After the migration, you can use the area report to examine the area improvement of your design. In general, the line structure of the area report does not change. For example, instead of seeing a `X bit floating-point multiply` on the old design, the source line for the changed design would show `fpga.vpfp.mul`. 
-
-You should confirm that the area used for the operation has indeed decreased from a Quartus compile. 
-
 ## Overview of Common Use Cases for `ap_float`
 
 You should consider migrating to `ap_float` types when you have precision requirements that differ from native `float` and `double` types, including both the range (number of exponent bits) and precision (number of mantissa bits) metrics. 
 
-Double precision operations cannot be placed into a single hardened DSP block like single-precision operations, so double precision operations are significantly more area intensive and use more hardware resources. Moreover, `float` only has 23 bits of mantissa while `double` has 52, this could be an overkill for applications that only seek a sweet spot in between.
-
 Additionally, the built in subnormal support with native `double` type is area intensive and being able to turn subnormal support off can be great for reducing area utilization if the application does not consider very small subnormal numbers.
 
 Finally, the various rounding modes offered along with the `ap_float` type can help trade-off mathematical accuracy for FPGA resource utilization.
-
-## Trading Off Mathematical Accuracy for Better Resource Utilization
-
-Two kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`, instantiated from the template function `RunSineApproximationKernel()`, implement a simple polynomial approximation of the sine function with single and double precision respectively. 
-
-The former uses `double` type to do so and the latter uses an `ap_float<11,44, Rnd>`. The `Rnd` rounding mode rounds towards zero. These two kernels will illustrate how to trade off accuracy for lesser FPGA resource utilization.
-
-See the section *Examining the Reports* to go over the differences in resource utilization between these kernels. See the section *Example of Output* to see the difference in accuracy of results produced by these kernels.
-
-Note how the kernel function within `RunSineApproximationKernel()` has been written once and the individual kernels are only differentiated by their input/output data types: `ApproximateSineWithDouble` uses `double` data type and `ApproximateSineWithAPFLoat` uses `ap_float` data type.
-
-```cpp
-// Approximate sine with native double type
-RunSineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
-                                                              double_result);
-...
-constexpr auto Rnd = ihc::fp_config::FP_Round::RZERO;
-using ap_float_double = ihc::ap_float<11, 44, Rnd>;
-
-// Approximate sine with `ap_float` type
-RunSineApproximationKernel<ap_float_double, ApproximateSineWithAPFloat>(
-    q, ap_float_input, ap_float_result);
-```
-
-This code-reuse is because `ap_float` is designed to fully blend in with native C++ types for syntax and semantics.
 
 ## Conversion Between Native Types and `ap_float`
 
@@ -98,7 +66,7 @@ In normal floating-point FPGA applications, floating-point literals are represen
 
 However, `ap_float` types that have non-standard exponent and mantissa widths cannot be trivially converted from C++ native `float` or `double` literals. As a result, the construction of an `ap_float` type may sometimes require FPGA logic resources to round the native floating-point constant to the specified `ap_float`. This is called 'intermediate conversion'.
  
-It is important to understand when the intermediate conversions can occur. Conversion does not only happen when you are explicitly casting numbers: it can also happen when you perform arithmetic operations using `ap_float` types with different precisions. Intermediate conversions are necessary because the operation needs to unify the types of the operands by promoting the less "dominant" types (types that have lower representable range). This is demonstrated by the kernel code in the function `TestConversionKernelA`.
+It is important to understand when the intermediate conversions can occur. Conversion does not only happen when you are explicitly casting numbers: it can also happen when you perform arithmetic operations using `ap_float` types with different precisions. Intermediate conversions are necessary because the operation needs to unify the types of the operands by promoting the less "dominant" types (types that have lower representable range). This is demonstrated by the kernel `ConversionKernelA` in the function `TestConversionKernelA`.
 
 ### Converting Native Numbers to `ap_float` Numbers with Minimal FPGA Hardware Resources
 
@@ -106,9 +74,9 @@ There are a few ways to generate compile-time `ap_float` constants that do not r
  
   1. Initializing `ap_float<8,23>` from `float` or `ap_float<11,52>` from `double` is just a direct bitwise copy (wires in RTL), so if the input `float`/`double` is a compile-time constant, the constructed `ap_float` is also a compile-time constant. You may want to extend these two types instead of the native `float` and `double` type if you want to use `ap_float` specific floating-point arithmetic controls (for example, the explicit binary operation presented in the next section *Using Explicit `ap_float` Math Functions in Place of Mathematical Operators*).
  
-  2. Converting from a constant to another `ap_float` that has rounding mode `FP_Round::ZERO` also results in a compile time constant. This rounding mode is also respected in a binary operation when promotion rounding is required. This is demonstrated by the kernel code in the function `TestConversionKernelB()`.
+  2. Converting from a constant to another `ap_float` that has rounding mode `FP_Round::ZERO` also results in a compile time constant. This rounding mode is also respected in a binary operation when promotion rounding is required. This is demonstrated by the kernel `ConversionKernelB` in the function `TestConversionKernelB()`.
 
-  3. The `convert_to` method of an `ap_float` returns itself rounded to a different type, it accepts a rounding mode as either accurate and area-intensive `RNE` mode (rounds to nearest, tie breaks to even) or inaccurate and non area-intensive `RZERO` (truncate towards zero) mode. When using `RZERO`, the compiler will also be able to convert a constant at compile time. This conversion bypasses the original rounding mode of the `ap_float` type. It is demonstrated by the code in the function `TestConversionKernelC`.
+  3. The `convert_to` method of an `ap_float` returns itself rounded to a different type, it accepts a rounding mode as either accurate and area-intensive `RNE` mode (rounds to nearest, tie breaks to even) or inaccurate and non area-intensive `RZERO` (truncate towards zero) mode. When using `RZERO`, the compiler will also be able to convert a constant at compile time. This conversion bypasses the original rounding mode of the `ap_float` type. It is demonstrated by the kernel `ConversionKernelC` in the function `TestConversionKernelC`.
 
 The kernel code in this tutorial contains comments that describe which operations result in generation of explicit cast operations and which do not.
 
@@ -195,7 +163,6 @@ To compare the resource utilization between arithmetic operators and explicit ma
 
 ## Key Concepts
 * `ap_float` can be used to improve the quality of results on the FPGA by leveraging various features like arbitrary precision, rounding modes, and explicit math functions.
-* Use `ap_float` to reduce the range or precision of the operation as required as opposed to native floating point types which have fixed range and precision.
 * Rounding mode `RZERO` produces simpler hardware at the cost of accuracy whereas the default rounding mode `RNE` produces more accurate results and uses more FPGA resources.
 * The explicit math functions provided by `ap_float` can be used in place of binary math operators such as `+, -, *` and `/`. The functions provide template parameters for fine tuning the accuracy of the operation and turning subnormal number support on or off.
 
@@ -314,20 +281,9 @@ Locate the pair of `report.html` files in either:
 * **Report-only compile**:  `ap_float_report.prj`
 * **FPGA hardware compile**: `ap_float.prj`
 
-### Examining the Area Reports for the Sine Approximation Kernels
-
-Navigate to the *Area Estimates* page. Click on the *Kernel System* line to expand it.
-
-Observe the difference in resource utilization of the kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`.
-
-Expand the lines with the kernel names by clicking on them and expand the sub hierarchies to observe how the `add, mult` and `div`
-operations use lesser resources for the `ApproximateSineWithAPFloat` kernel.
-
-You should observe an area reduction in resource utilization of up to 30% for the binary operations.
-
 ### Examining the Reports for Conversion Kernels
 
-You can find the usages of conversion in both the area report and the graph viewer. The name of the rounding block is "cast".
+You can find the usages of conversion in both the *Area Estimates* and the *System Viewer* report . The name of the rounding block is "cast".
 Let's look at the reports and analyze each kernel in the tutorial.
 
 1. Kernel: `ConversionKernelA`
@@ -350,17 +306,19 @@ Let's look at the reports and analyze each kernel in the tutorial.
 2. Kernel: `ConversionKernelB`
   This kernel uses the simpler rounding mode `RZERO`.
 
-  In the graph for the cluster under `ConversionKernelB`, you will find that it now only contains one "cast" node. This corresponds to the code:
+  In the graph for the cluster under `ConversionKernelB`, you will find that it now only contains one explicit "cast" node. This corresponds to the code:
   ```cpp
   x * num_accessor[0] + ...
   ```
   Although `x` and `num_accessor[0]` represent `ap_float`s constructed to use rounding mode `RZERO`, the result of this operation is cast to the higher precision `ap_float` using the default rounding mode `RNE` as the multiplication result is an operand for the next operation which uses higher precision.
 
-  The other cast node is represented by a combination of `shift`, `select`, and `and` operations hence only one node labeled as "cast" is visible in the reports.
-  
-  Similarly, the reduction in the number of cast nodes as compared to `ConversionKernelA` results in reduction of hardware resources used by `ConversionKernelC`.
-  
-2. Kernel: `ConversionKernelC`
+  The other cast node is implicit and represented by a combination of `shift`, `select`, and `and` operations. 
+
+  The reduction in the number of cast nodes as compared to `ConversionKernelA` results in a reduction of hardware resources used by `ConversionKernelB`.
+
+  Observe the differences in the resource usage of these two kernels by navigating to the *Area Estimates* report and looking at the entries under *Kernel System*.
+
+3. Kernel: `ConversionKernelC`
   This kernel shows how to use the `convert_to` function and modify the rounding mode for a specific operation.
 
   In the graph for the cluster under `Kernel_C`, you will find that it contains two "cast" nodes, corresponding to the conversions:
@@ -369,6 +327,8 @@ Let's look at the reports and analyze each kernel in the tutorial.
               y * num_accessor[0] + // This conversion is done explicitly
               z.convert_to<11, 52, RndZ>(); 
   ```
+
+  Similarly, the reduction in the number of cast nodes as compared to `ConversionKernelA` results in reduction of hardware resources used by `ConversionKernelC`.
 
 
 ### Examining the Reports for the Quadratic Equation Solver Kernels
@@ -395,20 +355,6 @@ You should also observe a significant area estimation reduction of the divider f
 ### Example of Output
 
 ```txt
-Testing basic arithmetic operators to approximate the sine function
-
-Native Type Result:
-Result     = 0.707
-Expected   = 0.707
-Difference = 1.11e-16
-
-Non Native Type Result:
-Result     = 0.707
-Expected   = 0.707
-Difference = 5.12e-14
-
-PASSED
-
 Testing conversions in ap_float
 Result     = 76.8
 Expected   = 76.8
@@ -424,7 +370,7 @@ Result     = 76.8
 Expected   = 76.8
 Difference = 1.81e-06
 
-PASSED
+Conversion: PASSED
 
 Calculating quadratic equation in higher precision
 Result     = 3.26 and 1.84
@@ -458,7 +404,9 @@ Difference = 0 and 1.49e-09
 Result     = NaN and NaN
 Expected   = NaN and NaN
 
-PASSED
+Quadratic Equation Solving: PASSED
+
+PASSED: all kernel results are correct.
 ```
 
 ### Discussion of Results
