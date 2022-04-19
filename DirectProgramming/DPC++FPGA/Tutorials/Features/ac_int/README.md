@@ -2,27 +2,28 @@
 
 This FPGA tutorial demonstrates how to use the Algorithmic C (AC) data type `ac_int` and some best practices.
 
-***Documentation***:  The [DPC++ FPGA Code Samples Guide](https://software.intel.com/content/www/us/en/develop/articles/explore-dpcpp-through-intel-fpga-code-samples.html) helps you to navigate the samples and build your knowledge of DPC++ for FPGA. <br>
-The [oneAPI DPC++ FPGA Optimization Guide](https://software.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide) is the reference manual for targeting FPGAs through DPC++. <br>
-The [oneAPI Programming Guide](https://software.intel.com/en-us/oneapi-programming-guide) is a general resource for target-independent DPC++ programming.
+#####Documentation
+-   The [DPC++ FPGA Code Samples Guide](https://software.intel.com/content/www/us/en/develop/articles/explore-dpcpp-through-intel-fpga-code-samples.html) helps you to navigate the samples and build your knowledge of DPC++ for FPGA.
+-   The [oneAPI DPC++ FPGA Optimization Guide](https://software.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide) is the reference manual for targeting FPGAs through DPC++.
+-   The [oneAPI Programming Guide](https://software.intel.com/en-us/oneapi-programming-guide) is a general resource for target-independent DPC++ programming.
 
 | Optimized for                     | Description
 ---                                 |---
-| OS                                | Linux* Ubuntu* 18.04/20.04, RHEL*/CentOS* 8, SUSE* 15; Windows* 10
-| Hardware                          | Intel® Programmable Acceleration Card (PAC) with Intel Arria® 10 GX FPGA <br> Intel® FPGA Programmable Acceleration Card (PAC) D5005 (with Intel Stratix® 10 SX) <br> Intel® FPGA 3rd party / custom platforms with oneAPI support <br> *__Note__: Intel® FPGA PAC hardware is only compatible with Ubuntu 18.04*
-| Software                          | Intel® oneAPI DPC++ Compiler <br> Intel® FPGA Add-On for oneAPI Base Toolkit
-| What you will learn               | Using the `ac_int` data type for basic operations <br> Efficiently using the left shift operation <br> Setting and reading certain bits of an `ac_int` number
+| OS                                | <ul><li>CentOS* Linux 8</li><li>Red Hat* Enterprise Linux* 8</li><li>SUSE* Linux Enterprise Server 15</li><li>Ubuntu* 18.04 LTS</li><li>Ubuntu 20.04</li><li>Windows* 10</li></ul>
+| Hardware                          | <ul><li>Intel® Programmable Acceleration Card (PAC) with Intel Arria® 10 GX FPGA</li><li>Intel® FPGA Programmable Acceleration Card (PAC) D5005 (with Intel Stratix® 10 SX)</li><li>Intel® FPGA 3rd party / custom platforms with oneAPI support</li></ul>*__Note__: Intel® FPGA PAC hardware is only compatible with Ubuntu 18.04*
+| Software                          | <ul><li>Intel® oneAPI DPC++ Compiler</li><li>Intel® FPGA Add-On for oneAPI Base Toolkit</li></ul>
+| What you will learn               | <ul><li>Using the `ac_int` data type for basic operations</li><li>Efficiently using the left shift operation</li><li>Setting and reading certain bits of an `ac_int` number</li></ul>
 | Time to complete                  | 20 minutes
 
 
 
 ## Purpose
 
-This FPGA tutorial shows how to use the `ac_int` data type with some simple examples.
+This FPGA tutorial shows you how to use the `ac_int` data type with some simple examples.
 
-This data type can be used in place of native integer types to generate area efficient and optimized designs for the FPGA. When you have a computation that does not require the full dynamic range of a 32-bit integer, you should replace your `int` variables with `ac_int` variables of the correct, reduced width. For example, if you know that a loop will iterate from 0 to 12, only 4 bits are required.
+This data type can be used in place of native integer types to generate area efficient and optimized designs for the FPGA. When you have a computation that does not require the full dynamic range of a 32-bit integer, replace your `int` variables with `ac_int` variables of the correct, reduced width. For example, if you know that a loop iterates from 0 to 12, only 4 bits are required.
 
-Please refer to the [oneAPI DPC++ FPGA Optimization Guide](https://software.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/adv-disadv-ac-dt.html) to see advantages and limitations of `ac_int` data types.
+Refer to the [oneAPI DPC++ FPGA Optimization Guide](https://software.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/adv-disadv-ac-dt.html) to see advantages and limitations of `ac_int` data types.
 
 ### Simple Code Example
 
@@ -32,31 +33,31 @@ ac_int<W, S> a;
 ```
 Here `W` is the width in bits and `S` is a bool indicating if the number is signed. Signed numbers use the most significant bit (MSB) to store the sign bit.
 
-To use the `ac_int` type in your code, you must include the following header:
+To use the `ac_int` type in your code, include the following header:
 
 ```cpp
 #include <sycl/ext/intel/ac_types/ac_int.hpp>
 ```
-Additionally, you must pass the flag `-qactypes` on Linux or `/Qactypes` on Windows to the `dpcpp` command when compiling your SYCL program in order to ensure that the headers are correctly included. In this tutorial, this is done in `src/CMakeLists.txt`.
+Additionally, you must pass the  `-qactypes` option on Linux or the `/Qactypes` option on Windows to the `dpcpp` command when compiling your SYCL program in order to ensure that the headers are correctly included. In this tutorial, the options are passed through the `src/CMakeLists.txt` file.
 
 ### Basic Operations and Promotion Rules
 
-When using `ac_int`, the results of addition, subtraction, multiplication, and division operations are automatically promoted to the number of bits needed to represent all possible results without overflowing. However, the data type you use to store the result may result in truncation.
+When using the `ac_int` data type, the results of addition, subtraction, multiplication, and division operations are automatically promoted to the number of bits needed to represent all possible results without overflowing. However, the data type you use to store the result might result in truncation.
 
-For example, the addition of two 8-bit integers results in a 9-bit result to support overflow. Internally, the result will be 9-bit. However, if the user attempts to store the result in an 8-bit container, `ac_int` will let the user do this, which leads to the most significant bit being discarded. The responsibility lies on the user to use the correct data type.
+For example, the addition of two 8-bit integers results in a 9-bit result to support overflow. Internally, the result is 9-bits long. However, if you attempt to store the result in an 8-bit container, the `ac_int` data type allows you to, which leads to the most significant bit being discarded. It is your responsibility to use the correct data type.
 
-These promotion rules are consistent across all architectures, so the behavior will be equivalent on x86 or on FPGA.
+These promotion rules are consistent across all architectures, so the behavior is the same on x86 devices and on FPGA devices.
 
 ### Shift Operations
 
 The behavior of shift operations of `ac_int` data types is slightly different from shift operations of native integer types. Some key points to remember are as follows:
-  - If the data type of the shift amount is not explicitly `unsigned` (either using `ac_int<N, false>` or using the `unsigned` keyword), then the compiler will generate a more complex shifter that allows negative shifts and positive shifts. A shift by a negative amount is equivalent to a positive shift in the opposite direction. Normally, you will not want to use negative shifting, so you should use an `unsigned` data type for the shift value to obtain a more resource efficient shifter.
+  - If the data type of the shift amount is not explicitly `unsigned` (either using `ac_int<N, false>` or using the `unsigned` keyword), then the compiler generates a more complex shifter that allows negative shifts and positive shifts. A shift by a negative amount is equivalent to a positive shift in the opposite direction. Normally, you to avoid using  negative shifting, so you use an `unsigned` data type for the shift value to obtain a more resource efficient shifter.
   - Shift values greater than the width of the data types are treated as a shift equal to the width of the data type.
-  - The shift operation can be done more efficiently by specifying the amount to shift with the smallest possible `ac_int`.
+  - The shift operation can be done more efficiently by specifying the amount to shift with the smallest possible `ac_int` size.
 
 ### Bit Select Operator
 
-The bit select operator `[]` allows reading and modifying an individual bit in an `ac_int`.
+The bit select operator `[]` allows reading and modifying an individual bit in an `ac_int` variable.
 
 *Note:* You must initialize an `ac_int` variable before accessing it using the bit select operator `[]`. Using the `[]` operator on an uninitialized `ac_int` variable is undefined behavior and can give you unexpected results. Assigning each bit explicitly using the `[]` operator does not count as initializing the `ac_int` variable.
 
@@ -78,11 +79,15 @@ Slice write is provided with the function `set_slc(int lsb, const ac_int<W, S> &
 
 This tutorial consists of five kernels:
 
-Kernel `BasicOpsInt` contains native `int` type addition, multiplication, and division operations, while kernel `BasicOpsAcInt` contains `ac_int` type addition, multiplication, and division operations. By comparing these two kernels, you will find reduced width `ac_int` generates hardware that is more area efficient than native `int`.
+- The `BasicOpsInt` kernel contains native `int` type addition, multiplication, and division operations
+- The `BasicOpsAcInt` kernel  contains `ac_int` type addition, multiplication, and division operations
+- The `ShiftOps` kernel  contains an `ac_int` left-shifter and an `ac_int` right-shifter, and the data type of the shift amount is a large width signed `ac_int`.
+- The `EfficientShiftOps` kernel  also contains an `ac_int` left-shifter and an `ac_int` right-shifter, but the data type of the shift amount is a reduced width unsigned `ac_int`.
+ - The `BitOps` kernel demonstrates bit operations with bit select operator `[]` and bit slice operations `slc` and `set_slc`.
 
-Kernel `ShiftOps` contains an `ac_int` left-shifter and an `ac_int` right-shifter, and the data type of the shift amount is a large width signed `ac_int`. In contrast, kernel `EfficientShiftOps` also contains an `ac_int` left-shifter and an `ac_int` right-shifter, but the data type of the shift amount is a reduced width unsigned `ac_int`. By comparing these two kernels, you will find shift operations of `ac_int` can generate more efficient hardware if the amount to shift by is stored in a minimally sized unsigned `ac_int`.
-
-Kernel `BitOps` demonstrates bit operations with bit select operator `[]` and bit slice operations `slc` and `set_slc`.
+By comparing the `BasicOpsInt` and `BasicOpsAcInt` kernels, you find that a reduced width `ac_int` variable generates hardware that is more area efficient than a native `int` variable.
+     
+By comparing the `ShiftOps` and `EfficientShiftOps` kernels, you find that shift operations on `ac_int` variables can generate more efficient hardware if the amount to shift by is stored in a minimally sized unsigned `ac_int` variable.
 
 ## Key Concepts
 * The `ac_int` data type can be used to generate hardware for only as many bits as are needed by your application. Native integer types must generate hardware for only 8, 16, 32, or 64 bits.
@@ -95,26 +100,26 @@ Code samples are licensed under the MIT license. See
 [License.txt](https://github.com/oneapi-src/oneAPI-samples/blob/master/License.txt) for details.
 
 ## Building the `ac_int` Tutorial
-> **Note**: If you have not already done so, set up your CLI
-> environment by sourcing  the `setvars` script located in
-> the root of your oneAPI installation.
+> If you have not already done so, set up your CLI environment by sourcing  the `setvars` script located in the root of your oneAPI installation:
 >
-> Linux Sudo: . /opt/intel/oneapi/setvars.sh
+> Linux `sudo`: `. /opt/intel/oneapi/setvars.sh`
+> Linux user: `. ~/intel/oneapi/setvars.sh`
+> Windows: `C:\Program Files(x86)\Intel\oneAPI\setvars.bat`
 >
-> Linux User: . ~/intel/oneapi/setvars.sh
->
-> Windows: C:\Program Files(x86)\Intel\oneAPI\setvars.bat
->
->For more information on environment variables, see Use the setvars Script for [Linux or macOS](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-linux-or-macos.html), or [Windows](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-windows.html).
+>For more information on environment variables, see [*Use the `setvars` Script for Linux or macOS*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-linux-or-macos.html) or [*Use the `setvars` Script for Windows*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-programming-guide/top/oneapi-development-environment-setup/use-the-setvars-script-with-windows.html).
 
 ### Include Files
 
 The included header `dpc_common.hpp` is located at `%ONEAPI_ROOT%\dev-utilities\latest\include` on your development system.
 
 ### Running Samples in DevCloud
-If running a sample in the Intel DevCloud, remember that you must specify the type of compute node and whether to run in batch or interactive mode. Compiles to FPGA are only supported on fpga_compile nodes. Executing programs on FPGA hardware is only supported on fpga_runtime nodes of the appropriate type, such as fpga_runtime:arria10 or fpga_runtime:stratix10.  Neither compiling nor executing programs on FPGA hardware are supported on the login nodes. For more information, see the Intel® oneAPI Base Toolkit Get Started Guide ([https://devcloud.intel.com/oneapi/documentation/base-toolkit/](https://devcloud.intel.com/oneapi/documentation/base-toolkit/)).
+If you are running a sample in the Intel DevCloud, remember that you must specify the type of compute node and whether to run in batch or interactive mode:
+  - Compiles to FPGA are supported only on `fpga_compile` nodes. 
+  - Executing programs on FPGA hardware is supported only on `fpga_runtime` nodes of the appropriate type, such as `fpga_runtime:arria10` or `fpga_runtime:stratix10`.
+ 
+On the login nodes, you cannot compile or execute programs on FPGA hardware. For more information, see the Intel® oneAPI Base Toolkit Get Started Guide ([https://devcloud.intel.com/oneapi/documentation/base-toolkit/](https://devcloud.intel.com/oneapi/documentation/base-toolkit/)).
 
-When compiling for FPGA hardware, it is recommended to increase the job timeout to 12h.
+When compiling for FPGA hardware, increase the job timeout to 12h.
 
 ### Using Visual Studio Code*  (Optional)
 
@@ -130,7 +135,7 @@ The basic steps to build and run a sample using VS Code include:
 To learn more about the extensions and how to configure the oneAPI environment, see
 [Using Visual Studio Code with Intel® oneAPI Toolkits](https://software.intel.com/content/www/us/en/develop/documentation/using-vs-code-with-intel-oneapi/top.html).
 
-After learning how to use the extensions for Intel oneAPI Toolkits, return to this readme for instructions on how to build and run a sample.
+After learning how to use the extensions for Intel oneAPI Toolkits, return to this README file for instructions on how to build and run a sample.
 
 ### On a Linux* System
 
@@ -177,7 +182,7 @@ After learning how to use the extensions for Intel oneAPI Toolkits, return to th
      make fpga
      ```
 
-3. (Optional) As the above hardware compile may take several hours to complete, FPGA precompiled binaries (compatible with Linux* Ubuntu* 18.04) can be downloaded <a href="https://iotdk.intel.com/fpga-precompiled-binaries/latest/ac_int.fpga.tar.gz" download>here</a>.
+3. (Optional) As the earlier hardware compile can take several hours to complete, FPGA precompiled binaries (compatible with Ubuntu 18.04) can be downloaded [here](https://iotdk.intel.com/fpga-precompiled-binaries/latest/ac_int.fpga.tar.gz).
 
 ### On a Windows* System
 
@@ -216,12 +221,12 @@ After learning how to use the extensions for Intel oneAPI Toolkits, return to th
      ```
 
 *Note:* The Intel® PAC with Intel Arria® 10 GX FPGA and Intel® FPGA PAC D5005
-(with Intel Stratix® 10 SX) do not yet support Windows*. Compiling to FPGA
+(with Intel Stratix® 10 SX) boards do not yet support Windows*. Compiling to FPGA
 hardware on Windows* requires a third-party or custom Board Support Package
 (BSP) with Windows* support.<br> *Note:* If you encounter any issues with long
-paths when compiling under Windows*, you may have to create your ‘build’
-directory in a shorter path, for example c:\samples\build. You can then run
-cmake from that directory, and provide cmake with the full path to your sample
+paths when compiling under Windows*, you might have to create your `build`
+directory in a shorter path, for example `c:\samples\build`. You can then run
+`cmake` from that directory, and provide `cmake` with the full path to your sample
 directory.
 
 ### Troubleshooting
@@ -230,21 +235,20 @@ the `VERBOSE=1` argument:
 ``make VERBOSE=1``
 For more comprehensive troubleshooting, use the Diagnostics Utility for
 Intel® oneAPI Toolkits, which provides system checks to find missing
-dependencies and permissions errors.
-[Learn more](https://software.intel.com/content/www/us/en/develop/documentation/diagnostic-utility-user-guide/top.html).
+dependencies and permissions errors. For details, refer to [Diagnostics Utility for Intel oneAPI Toolkits User Guide](https://software.intel.com/content/www/us/en/develop/documentation/diagnostic-utility-user-guide/top.html).
 
 ### In Third-Party Integrated Development Environments (IDEs)
 
-You can compile and run this tutorial in the Eclipse* IDE (in Linux*) and the Visual Studio* IDE (in Windows*).
-For instructions, refer to the following link: [Intel® oneAPI DPC++ FPGA Workflows on Third-Party IDEs](https://software.intel.com/en-us/articles/intel-oneapi-dpcpp-fpga-workflow-on-ide)
+You can compile and run this tutorial in the Eclipse* IDE (in Linux) and the Visual Studio* IDE (in Windows).
+For instructions, refer to [Intel® oneAPI DPC++ FPGA Workflows on Third-Party IDEs](https://software.intel.com/en-us/articles/intel-oneapi-dpcpp-fpga-workflow-on-ide).
 
 ## Examining the Reports
 
-Locate `report.html` in the `ac_int_report.prj/reports/` directory. Open the report in any of Chrome*, Firefox*, Edge*, or Internet Explorer*.
+Locate `report.html` in the `ac_int_report.prj/reports/` directory. Open the report in a supported web browser: Chrome*, Firefox*, Edge*, or Internet Explorer*.
 
-On the main report page, scroll down to the section titled *Compile Estimated Kernel Resource Utilization Summary*. You can see the overall resource usage of kernel `BasicOpsAcInt` is less than kernel `BasicOpsInt`. Navigate to *Area Analysis of System* (*Area Analysis* > *Area Analysis of System*), you can find resource usage information of the individual addition, multiplication, and division operations, and you can verify each individual operation consumes fewer resources in kernel `BasicOpsAcInt` than in kernel `BasicOpsInt`.
+On the main report page, scroll down to the section titled **Compile Estimated Kernel Resource Utilization Summary**. You can see the overall resource usage of kernel `BasicOpsAcInt` is less than kernel `BasicOpsInt`. Navigate to **Area Analysis of System** (**Area Analysis > Area Analysis of System**), you can find resource usage information of the individual addition, multiplication, and division operations, and you can verify each individual operation consumes fewer resources in kernel `BasicOpsAcInt` than in kernel `BasicOpsInt`.
 
-Navigate to *System Viewer* (*Views* > *System Viewer*) and find the cluster in kernel `ShiftOps` that contains the left-shifter node (`<<`) and the right-shifter node (`>>`). Similarly, locate the cluster that contains the left-shifter node and the right-shifter node in kernel `EfficientShiftOps`. Observe that the compiler generates an additional shifter in kernel `ShiftOps` to deal with the signedness of the shift amount `b`. You can verify that kernel `EfficientShiftOps` consumes fewer resources than kernel `ShiftOps` in *Compile Estimated Kernel Resource Utilization Summary* on the main report page and *Area Analysis of System*.
+Navigate to **System Viewer** (**Views > System Viewer**) and find the cluster in kernel `ShiftOps` that contains the left-shifter node (`<<`) and the right-shifter node (`>>`). Similarly, locate the cluster that contains the left-shifter node and the right-shifter node in kernel `EfficientShiftOps`. Observe that the compiler generates an additional shifter in kernel `ShiftOps` to deal with the signedness of the shift amount `b`. You can verify that kernel `EfficientShiftOps` consumes fewer resources than kernel `ShiftOps` in **Compile Estimated Kernel Resource Utilization Summary** on the main report page and **Area Analysis of System**.
 
 ## Running the Sample
 
@@ -269,4 +273,4 @@ PASSED: all kernel results are correct.
 
 ### Discussion
 
-`ac_int` can help minimize the generated hardware and achieve the same numerical result as native integer types. This can be very useful when the logic does not need to utilize all the bits provided by the native integer type.
+When the logic in your design does not need to use all the bits provided by the native integer type, using the `ac_int` data type can help minimize the generated hardware and achieve the same numerical result.
