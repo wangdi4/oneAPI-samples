@@ -56,9 +56,38 @@ You can easily convert your existing designs that use native floating-point type
 
 You should consider migrating to `ap_float` types when you have precision requirements that differ from native `float` and `double` types, including both the range (number of exponent bits) and precision (number of mantissa bits) metrics. 
 
+Starting from oneAPI 2021.2 release, Intel® oneAPI DPC++ Compiler enables fast math by default, which allows relatively aggressive floating point math optimizations for `float` and `double`. These optimizations cause results that don't conform with the ANSI standard (as oneAPI 2021.1 release and GCC do), which trade-off precision for performance and area.
+
+To achieve double precision that adheres to the ANSI conformance, you must pass the flag `-no-fma -fp-model=precise` (Linux) / `/Qfma- /fp:precise` (Windows) to the `dpcpp` command when compiling your SYCL program. However, double precision operations cannot be placed into a single hardened DSP block like single-precision operations, so double precision operations are significantly more area intensive and use more hardware resources. Moreover, `float` only has 23 bits of mantissa while `double` has 52, this could be an overkill for applications that only seek a sweet spot in between.
+
 Additionally, the built in subnormal support with native `double` type is area intensive and being able to turn subnormal support off can be great for reducing area utilization if the application does not consider very small subnormal numbers.
 
 Finally, the various rounding modes offered along with the `ap_float` type can help trade-off mathematical accuracy for FPGA resource utilization.
+
+## Trading Off Mathematical Accuracy for Better Resource Utilization
+
+In this tutorial, the template function `RunSineApproximationKernel()` instantiates two kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`, which implement a simple polynomial approximation of the sine function with single and double precision respectively.
+
+The former uses `double` type to do so and the latter uses an `ap_float<11,44, Rnd>`. The `Rnd` rounding mode rounds towards zero. These two kernels will illustrate how to trade off accuracy for lesser FPGA resource utilization.
+
+See the section *Examining the Reports* to go over the differences in resource utilization between these kernels. See the section *Example of Output* to see the difference in accuracy of results produced by these kernels.
+
+Note how the kernel function within `RunSineApproximationKernel()` has been written once and the individual kernels are only differentiated by their input/output data types: `ApproximateSineWithDouble` uses `double` data type and `ApproximateSineWithAPFLoat` uses `ap_float` data type.
+
+```cpp
+// Approximate sine with native double type
+RunSineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
+                                                              double_result);
+...
+constexpr auto Rnd = ihc::fp_config::FP_Round::RZERO;
+using ap_float_double = ihc::ap_float<11, 44, Rnd>;
+
+// Approximate sine with `ap_float` type
+RunSineApproximationKernel<ap_float_double, ApproximateSineWithAPFloat>(
+    q, ap_float_input, ap_float_result);
+```
+
+This code-reuse is because `ap_float` is designed to fully blend in with native C++ types for syntax and semantics.
 
 ## Conversion Between Native Types and `ap_float`
 

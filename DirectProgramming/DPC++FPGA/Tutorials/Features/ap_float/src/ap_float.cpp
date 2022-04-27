@@ -20,12 +20,20 @@ using namespace sycl;
 // Forward declare the kernel name in the global scope.
 // This is a FPGA best practice that reduces name mangling in the optimization
 // reports.
+class ApproximateSineWithDouble;
+class ApproximateSineWithAPFloat;
+
 class ConversionKernelA;
 class ConversionKernelB;
 class ConversionKernelC;
 
 class SimpleQuadraticEqnSolverKernel;
 class SpecializedQuadraticEqnSolverKernel;
+
+// The number of terms in the polynomial approximation of the sine function
+constexpr int kSineApproximateTermsCount = 10;
+
+constexpr double kSineApproximationEpsilon = 1e-13;
 
 // ap_float< 8,23> has the same number of exponent and mantissa bits as native
 // float type
@@ -47,6 +55,103 @@ using APFloatTypeB = ihc::ap_float<8, 23, kRoundingModeRZERO>;
 using APDoubleTypeB = ihc::ap_float<11, 52, kRoundingModeRZERO>;
 
 constexpr auto kRoundingModeRNE = ihc::fp_config::FP_Round::RNE;
+
+// -------------------------------------------------------------------------- //
+// Polynomial Sine Approximation example
+// -------------------------------------------------------------------------- //
+
+// The function template to generate sine-approximation kernels with different
+// floating data types
+template <typename T, class KernelTag>
+void SineApproximationKernel(queue &q, const T &input, T &output) {
+  buffer<T, 1> inp_buffer(&input, 1);
+  buffer<T, 1> res_buffer(&output, 1);
+
+  q.submit([&](handler &h) {
+    accessor x{inp_buffer, h, read_only};
+    accessor retval{res_buffer, h, write_only, no_init};
+
+    h.single_task<KernelTag>([=] {
+      T res = 0.0;
+      T sign = 1.0;
+      T term = x[0];
+      T numerator = x[0];
+      T denom = 1.0;
+
+#pragma unroll
+      for (int i = 1; i <= kSineApproximateTermsCount; ++i) {
+        res += term;
+        sign = -sign;
+        denom *= 2 * i * (2 * i + 1);
+        numerator *= x[0] * x[0];
+        term = sign * numerator / denom;
+      }
+      retval[0] = res;
+    });
+  });
+}
+
+bool TestSineApproximation(queue &q) {
+  bool passed_native = false;
+  bool passed_non_native = false;
+  bool passed_comparison = false;
+
+  std::cout << "Testing basic arithmetic operators to approximate the sine "
+               "function\n\n";
+
+  double input = M_PI_4;  // pi / 4
+  double expected =
+      M_SQRT1_2;  // 1/square_root(2), it is the value of sin(input);
+  double double_result;
+
+  // Approximate with native double type
+  SineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
+                                                             double_result);
+
+  // Approximate with ap_float type
+  // We set the rounding mode to RZERO (truncate to zero) because this allows us
+  // to generate compile-time ap_float constants from double type literals shown
+  // below, which eliminates the area usage for initialization.
+  using APDoubleTypeC = ihc::ap_float<11, 44, kRoundingModeRZERO>;
+
+  APDoubleTypeC ap_float_input = (APDoubleTypeC)input;
+  APDoubleTypeC ap_float_result;
+
+  SineApproximationKernel<APDoubleTypeC, ApproximateSineWithAPFloat>(
+      q, ap_float_input, ap_float_result);
+
+  double difference_a = std::abs(double_result - expected);
+  double difference_b = std::abs((double)ap_float_result - expected);
+
+  std::cout << "Native Type Result:\n";
+  std::cout << "Result     = " << std::setprecision(3) << (double)double_result
+            << "\n";
+  std::cout << "Expected   = " << std::setprecision(3) << (double)expected
+            << "\n";
+  std::cout << "Difference = " << std::setprecision(3) << (double)difference_a
+            << "\n\n";
+
+  std::cout << "Non Native Type Result:\n";
+  std::cout << "Result     = " << std::setprecision(3)
+            << (double)ap_float_result << "\n";
+  std::cout << "Expected   = " << std::setprecision(3) << (double)expected
+            << "\n";
+  std::cout << "Difference = " << std::setprecision(3) << (double)difference_b
+            << "\n";
+
+  passed_native = (difference_a < kSineApproximationEpsilon);
+  passed_non_native = (difference_b < kSineApproximationEpsilon);
+  passed_comparison = (difference_a < difference_b);
+
+  std::cout << "\nSine Approximation: ";
+  if (passed_native && passed_comparison && passed_comparison) {
+    std::cout << "PASSED\n\n";
+    return true;
+  } else {
+    std::cout << "FAILED\n\n";
+    return false;
+  }
+}
 
 // -------------------------------------------------------------------------- //
 // Rounding Mode and native type to ap_float type conversion examples
@@ -419,6 +524,7 @@ int main() {
     // Create the SYCL device queue
     queue q(selector, dpc_common::exception_handler);
 
+    passed &= TestSineApproximation(q);
     passed &= TestAllConversionKernels(q);
     passed &= TestQuadraticEquationSolverKernels(q);
 
