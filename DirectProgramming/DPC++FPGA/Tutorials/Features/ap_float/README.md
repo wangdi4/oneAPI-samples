@@ -11,14 +11,14 @@ The [oneAPI Programming Guide](https://software.intel.com/en-us/oneapi-programmi
 | OS                                | Linux* Ubuntu* 18.04/20.04, RHEL*/CentOS* 8, SUSE* 15; Windows* 10
 | Hardware                          | Intel® Programmable Acceleration Card (PAC) with Intel Arria® 10 GX FPGA <br> Intel® FPGA Programmable Acceleration Card (PAC) D5005 (with Intel Stratix® 10 SX) <br> Intel® FPGA 3rd party / custom platforms with oneAPI support <br> *__Note__: Intel® FPGA PAC hardware is only compatible with Ubuntu 18.04* 
 | Software                          | Intel® oneAPI DPC++ Compiler <br> Intel® FPGA Add-On for oneAPI Base Toolkit
-| What you will learn               | Including and using the `ap_float` type <br> Using `ap_float` type to trade off mathematical accuracy for lesser resource utilization <br> Using various `ap_float` rounding modes and their effect on accuracy and resource utilization <br> Using the `ap_float `math functions for better quality of results
+| What you will learn               | Including and using the `ap_float` type <br> Using various `ap_float` rounding modes and their effect on accuracy and resource utilization <br> Using the `ap_float `math functions for better quality of results
 | Time to complete                  | 1 hour
 
 ## Purpose
 
 This FPGA tutorial shows how to use the `ap_float` type with some simple examples and recommended best practices.
 
-This data-type can be used in place of native floating point types to generate area efficient and optimized designs for the FPGA. For example, operations which do not utilize all the bits of the native types or designs which do not require all of the range and precision of native types are good candidates for replacement with the `ap_float` type.
+`ap_float` can be used in place of native floating point types which do not utilize all the bits of the native types or designs which do not require all of the range and precision of native types. It can also be used when porting floating-point parameterizations (like bfloat16) in an existing design to oneAPI implementations.
 
 This tutorial will present the following:
 1. How to include the `ap_float` type and an overview of common `ap_float` use cases.
@@ -33,6 +33,21 @@ An `ap_float` number can be defined as follows:
 ihc::ap_float<E, M> a;
 ```
 which consists of `E+M+1` bits: one sign bit, `E` exponent bits and `M` mantissa bits. For example, `ap_float<8,23>` has the same number of exponent and mantissa bits as native `float`, and `ap_float<11,52>` has the same number of exponent and mantissa bits as native `double`.
+
+Currently the precisons that are supported in `ap_float` include:
+
+```cpp
+ap_float<8, 7>,  // same E and M widths as bfloat
+ap_float<5, 10>, // same E and M widths as half precision
+ap_float<8, 10>,
+ap_float<8, 17>,
+ap_float<8, 23>, // same E and M as the native float type
+ap_float<8, 26>,
+ap_float<10, 35>,
+ap_float<11, 44>,
+ap_float<11, 52>, // same E and M as the native double type
+ap_float<15, 63>  // Extended double precision
+```
 
 Optionally, another template parameter can be specified to set the rounding mode. For more details please refer to the section [*Declare the ap_float Data Type*](https://www.intel.com/content/www/us/en/develop/documentation/oneapi-fpga-optimization-guide/top/optimize-your-design/resource-use/data-types-and-operations/var-prec-fp-sup/declare-and-use-the-ac-data-types/declare-the-ap-float-data-type.html) in the Intel® oneAPI DPC++ FPGA Optimization Guide.
 
@@ -54,37 +69,34 @@ You can easily convert your existing designs that use native floating-point type
 
 ## Overview of Common Use Cases for `ap_float`
 
-You should consider migrating to `ap_float` types when you have precision requirements that differ from native `float` and `double` types, including both the range (number of exponent bits) and precision (number of mantissa bits) metrics. 
-
-Starting from oneAPI 2021.2 release, Intel® oneAPI DPC++ Compiler enables fast math by default, which allows relatively aggressive floating point math optimizations for `float` and `double`. These optimizations cause results that don't conform with the ANSI standard (as oneAPI 2021.1 release and GCC do), which trade-off precision for performance and area.
-
-To achieve double precision that adheres to the ANSI conformance, you must pass the flag `-no-fma -fp-model=precise` (Linux) / `/Qfma- /fp:precise` (Windows) to the `dpcpp` command when compiling your SYCL program. However, double precision operations cannot be placed into a single hardened DSP block like single-precision operations, so double precision operations are significantly more area intensive and use more hardware resources. Moreover, `float` only has 23 bits of mantissa while `double` has 52, this could be an overkill for applications that only seek a sweet spot in between.
+You should consider migrating to `ap_float` types when you have precision requirements that differ from native `float` and `double` types, including both the range (number of exponent bits) and precision (number of mantissa bits) metrics. You can also use `ap_float` to migrate existing designs that contain non-native floating-point types to oneAPI implementations.
 
 Additionally, the built in subnormal support with native `double` type is area intensive and being able to turn subnormal support off can be great for reducing area utilization if the application does not consider very small subnormal numbers.
 
 Finally, the various rounding modes offered along with the `ap_float` type can help trade-off mathematical accuracy for FPGA resource utilization.
 
-## Trading Off Mathematical Accuracy for Better Resource Utilization
+## Using `ap_float` for Non-native Floating Point Parameterization
 
-In this tutorial, the template function `RunSineApproximationKernel()` instantiates two kernels `ApproximateSineWithDouble` and `ApproximateSineWithAPFloat`, which implement a simple polynomial approximation of the sine function with single and double precision respectively.
+In this tutorial, the template function `RunSineApproximationKernel()` instantiates two kernels `ApproximateSineWithAPFloat_11_44` and `ApproximateSineWithBFloat16`, which implement a simple polynomial approximation of the sine function with `ap_float<11, 44>` and `ap_float<8, 7>` respectively. Note that the header file `ap_float.hpp` defines the type alias of `ap_float<8, 7>` as
 
-The former uses `double` type to do so and the latter uses an `ap_float<11,44, Rnd>`. The `Rnd` rounding mode rounds towards zero. These two kernels will illustrate how to trade off accuracy for lesser FPGA resource utilization.
+```cpp
+using bfloat16 = ap_float<8, 7, fp_config::FP_Round::RNE>;
+```
 
 See the section *Examining the Reports* to go over the differences in resource utilization between these kernels. See the section *Example of Output* to see the difference in accuracy of results produced by these kernels.
 
-Note how the kernel function within `RunSineApproximationKernel()` has been written once and the individual kernels are only differentiated by their input/output data types: `ApproximateSineWithDouble` uses `double` data type and `ApproximateSineWithAPFLoat` uses `ap_float` data type.
+Note how the kernel function within `RunSineApproximationKernel()` has been written once and the individual kernels are only differentiated by their input/output data types: `ApproximateSineWithAPFloat_11_44` uses `ap_float<11, 44>` data type and `ApproximateSineWithBFloat16` uses `bfloat16` data type.
 
 ```cpp
-// Approximate sine with native double type
-RunSineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
-                                                              double_result);
+// Approximate sine with `ap_float<11, 44>` type
+using APFloat_11_44 = ihc::ap_float<11, 44>;
+SineApproximationKernel<APFloat_11_44, ApproximateSineWithAPFloat_11_44>(
+      q, (APFloat_11_44)input, ap_float_result);
 ...
-constexpr auto Rnd = ihc::fp_config::FP_Round::RZERO;
-using ap_float_double = ihc::ap_float<11, 44, Rnd>;
 
-// Approximate sine with `ap_float` type
-RunSineApproximationKernel<ap_float_double, ApproximateSineWithAPFloat>(
-    q, ap_float_input, ap_float_result);
+// Approximate sine with `bfloat16` type
+SineApproximationKernel<ihc::bfloat16, ApproximateSineWithBFloat16>(
+      q, (ihc::bfloat16)input, bfloat_result);
 ```
 
 This code-reuse is because `ap_float` is designed to fully blend in with native C++ types for syntax and semantics.
@@ -310,6 +322,12 @@ Locate the pair of `report.html` files in either:
 * **Report-only compile**:  `ap_float_report.prj`
 * **FPGA hardware compile**: `ap_float.prj`
 
+### Examining the Area Reports for the Sine Approximation Kernels
+
+Navigate to the *Area Estimates* page. Click on the *Kernel System* line to expand it. Observe the difference in resource utilization of the kernels `ApproximateSineWithAPFloat_11_44` and `ApproximateSineWithBFloat16`.
+
+Expand the lines with the kernel names by clicking on them and expand the sub hierarchies to observe the resource utilization of each arithmetic operation.
+
 ### Examining the Reports for Conversion Kernels
 
 You can find the usages of conversion in both the *Area Estimates* and the *System Viewer* report . The name of the rounding block is "cast".
@@ -384,6 +402,18 @@ You should also observe a significant area estimation reduction of the divider f
 ### Example of Output
 
 ```txt
+ap_float<11,44> Result:
+Result     = 0.707
+Expected   = 0.707
+Difference = 5.12e-14
+
+bfloat16 Result:
+Result     = 0.707
+Expected   = 0.707
+Difference = 7.55e-05
+
+Sine Approximation: PASSED
+
 Testing conversions in ap_float
 Result     = 76.8
 Expected   = 76.8

@@ -20,8 +20,8 @@ using namespace sycl;
 // Forward declare the kernel name in the global scope.
 // This is a FPGA best practice that reduces name mangling in the optimization
 // reports.
-class ApproximateSineWithDouble;
-class ApproximateSineWithAPFloat;
+class ApproximateSineWithAPFloat_11_44;
+class ApproximateSineWithBFloat16;
 
 class ConversionKernelA;
 class ConversionKernelB;
@@ -32,8 +32,6 @@ class SpecializedQuadraticEqnSolverKernel;
 
 // The number of terms in the polynomial approximation of the sine function
 constexpr int kSineApproximateTermsCount = 10;
-
-constexpr double kSineApproximationEpsilon = 1e-13;
 
 // ap_float< 8,23> has the same number of exponent and mantissa bits as native
 // float type
@@ -61,7 +59,7 @@ constexpr auto kRoundingModeRNE = ihc::fp_config::FP_Round::RNE;
 // -------------------------------------------------------------------------- //
 
 // The function template to generate sine-approximation kernels with different
-// floating data types
+// floating-point data types
 template <typename T, class KernelTag>
 void SineApproximationKernel(queue &q, const T &input, T &output) {
   buffer<T, 1> inp_buffer(&input, 1);
@@ -101,50 +99,42 @@ bool TestSineApproximation(queue &q) {
 
   double input = M_PI_4;  // pi / 4
   double expected =
-      M_SQRT1_2;  // 1/square_root(2), it is the value of sin(input);
-  double double_result;
+      M_SQRT1_2;  // 1/square_root(2), it is the value of sin(pi / 4);
 
-  // Approximate with native double type
-  SineApproximationKernel<double, ApproximateSineWithDouble>(q, input,
-                                                             double_result);
+  // Approximate with the ap_float type with 11 exponent bits and 44 mantissa
+  // bits
+  using APFloat_11_44 = ihc::ap_float<11, 44>;
+  APFloat_11_44 ap_float_result;
 
-  // Approximate with ap_float type
-  // We set the rounding mode to RZERO (truncate to zero) because this allows us
-  // to generate compile-time ap_float constants from double type literals shown
-  // below, which eliminates the area usage for initialization.
-  using APDoubleTypeC = ihc::ap_float<11, 44, kRoundingModeRZERO>;
+  SineApproximationKernel<APFloat_11_44, ApproximateSineWithAPFloat_11_44>(
+      q, (APFloat_11_44)input, ap_float_result);
+  double difference_a = std::abs((double)ap_float_result - expected);
 
-  APDoubleTypeC ap_float_input = (APDoubleTypeC)input;
-  APDoubleTypeC ap_float_result;
-
-  SineApproximationKernel<APDoubleTypeC, ApproximateSineWithAPFloat>(
-      q, ap_float_input, ap_float_result);
-
-  double difference_a = std::abs(double_result - expected);
-  double difference_b = std::abs((double)ap_float_result - expected);
-
-  std::cout << "Native Type Result:\n";
-  std::cout << "Result     = " << std::setprecision(3) << (double)double_result
-            << "\n";
+  std::cout << "ap_float<11,44> Result:\n";
+  std::cout << "Result     = " << std::setprecision(3)
+            << (double)ap_float_result << "\n";
   std::cout << "Expected   = " << std::setprecision(3) << (double)expected
             << "\n";
   std::cout << "Difference = " << std::setprecision(3) << (double)difference_a
             << "\n\n";
 
-  std::cout << "Non Native Type Result:\n";
-  std::cout << "Result     = " << std::setprecision(3)
-            << (double)ap_float_result << "\n";
+  // Approximate with bfloat16, which is an alias of type ap_float<8,7>
+  ihc::bfloat16 bfloat_result;
+  SineApproximationKernel<ihc::bfloat16, ApproximateSineWithBFloat16>(
+      q, (ihc::bfloat16)input, bfloat_result);
+  double difference_b = std::abs((double)bfloat_result - expected);
+
+  std::cout << "bfloat16 Result:\n";
+  std::cout << "Result     = " << std::setprecision(3) << (double)bfloat_result
+            << "\n";
   std::cout << "Expected   = " << std::setprecision(3) << (double)expected
             << "\n";
   std::cout << "Difference = " << std::setprecision(3) << (double)difference_b
             << "\n";
 
-  passed_native = (difference_a < kSineApproximationEpsilon);
-  passed_non_native = (difference_b < kSineApproximationEpsilon);
-  passed_comparison = (difference_a < difference_b);
-
+  // Approximation with float is more accurate than approximation with bfloat
   std::cout << "\nSine Approximation: ";
-  if (passed_native && passed_comparison && passed_comparison) {
+  if (difference_a < difference_b) {
     std::cout << "PASSED\n\n";
     return true;
   } else {
