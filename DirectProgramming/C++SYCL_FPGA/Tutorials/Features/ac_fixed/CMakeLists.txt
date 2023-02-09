@@ -4,14 +4,14 @@ if(UNIX)
 else() # Windows
     # Force CMake to use icx-cl rather than the default C++ compiler/linker 
     # (needed on Windows only)
-    include (CMakeForceCompiler)
-    CMAKE_FORCE_CXX_COMPILER (icx-cl IntelDPCPP)
-    include (Platform/Windows-Clang)
+    set(CMAKE_CXX_COMPILER icx)
 endif()
 
-cmake_minimum_required (VERSION 3.4)
+cmake_minimum_required(VERSION 3.23.0)
 
 project(ACFixed CXX)
+
+find_package(IntelSYCL REQUIRED)
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -49,6 +49,7 @@ target_include_directories(${EMULATOR_TARGET} PRIVATE ../../../../include)
 set_target_properties(${EMULATOR_TARGET} PROPERTIES COMPILE_FLAGS "${EMULATOR_COMPILE_FLAGS}")
 set_target_properties(${EMULATOR_TARGET} PROPERTIES LINK_FLAGS "${EMULATOR_LINK_FLAGS}")
 add_custom_target(fpga_emu DEPENDS ${EMULATOR_TARGET})
+add_sycl_to_target(TARGET ${EMULATOR_TARGET} SOURCES ac_fixed.cpp)
 
 ###############################################################################
 ### Generate Report
@@ -63,6 +64,7 @@ add_custom_target(report DEPENDS ${FPGA_EARLY_IMAGE})
 set_target_properties(${FPGA_EARLY_IMAGE} PROPERTIES COMPILE_FLAGS "${HARDWARE_COMPILE_FLAGS}")
 set_target_properties(${FPGA_EARLY_IMAGE} PROPERTIES LINK_FLAGS "${HARDWARE_LINK_FLAGS} -fsycl-link=early")
 # fsycl-link=early stops the compiler after RTL generation, before invoking Quartus®
+add_sycl_to_target(TARGET ${FPGA_EARLY_IMAGE} SOURCES ac_fixed.cpp)
 
 ###############################################################################
 ### FPGA Simulator
@@ -79,6 +81,7 @@ set_target_properties(${SIMULATOR_TARGET} PROPERTIES COMPILE_FLAGS "${SIMULATOR_
 set_target_properties(${SIMULATOR_TARGET} PROPERTIES LINK_FLAGS "${SIMULATOR_LINK_FLAGS} -reuse-exe=${CMAKE_BINARY_DIR}/${SIMULATOR_TARGET}")
 # The -reuse-exe flag enables rapid recompilation of host-only code changes.
 # See C++SYCL_FPGA/GettingStarted/fast_recompile for details.
+add_sycl_to_target(TARGET ${SIMULATOR_TARGET} SOURCES ac_fixed.cpp)
 
 ###############################################################################
 ### FPGA Hardware
@@ -95,3 +98,4 @@ set_target_properties(${FPGA_TARGET} PROPERTIES COMPILE_FLAGS "${HARDWARE_COMPIL
 set_target_properties(${FPGA_TARGET} PROPERTIES LINK_FLAGS "${HARDWARE_LINK_FLAGS} -reuse-exe=${CMAKE_BINARY_DIR}/${FPGA_TARGET}")
 # The -reuse-exe flag enables rapid recompilation of host-only code changes.
 # See C++SYCL_FPGA/GettingStarted/fast_recompile for details.
+add_sycl_to_target(TARGET ${FPGA_TARGET} SOURCES ac_fixed.cpp)
