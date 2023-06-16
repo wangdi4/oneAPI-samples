@@ -4,6 +4,8 @@
 
 #include "exception_handler.hpp"
 
+using namespace sycl::ext::oneapi::experimental;
+
 using ValueT = int;
 
 // offloaded computation
@@ -14,10 +16,10 @@ ValueT SomethingComplicated(ValueT val) { return (ValueT)(val * (val + 1)); }
 struct FunctorStreamingIP {
   // Use the 'conduit' annotation on a kernel argument to specify it to be
   // a streaming kernel argument.
-  conduit ValueT *input;
+  annotated_arg<ValueT *, decltype(properties{conduit})> input;
   // A kernel with a streaming invocation interface can also independently
   // have register map kernel arguments, when annotated by 'register_map'.
-  register_map ValueT *output;
+  annotated_arg<ValueT *, decltype(properties{register_map})> output;
   // Without the annotations, kernel arguments will be inferred to be streaming
   // kernel arguments if the kernel invocation interface is streaming, and
   // vise-versa.
