@@ -43,7 +43,7 @@ public:
          1,      // read_write_mode, 0: ReadWrite, 1: Read, 2: Write
          1,      // maxburst
          0,      // align, 0 defaults to alignment of the type
-         1)      // waitrequest, 0: false, 1: true
+         0)      // waitrequest, 0: false, 1: true
 #endif
       TT *a_ptr;   // Input matrix pointer
   int repetitions; // Number of times to write the same matrix to the pipe
@@ -196,7 +196,7 @@ public:
          1,      // read_write_mode, 0: ReadWrite, 1: Read, 2: Write
          1,      // maxburst
          0,      // align, 0 defaults to alignment of the type
-         1)      // waitrequest, 0: false, 1: true
+         0)      // waitrequest, 0: false, 1: true
 #endif
       TT *b_ptr;   // Input matrix pointer
   int repetitions; // Number of times to write the same matrix to the pipe
@@ -341,7 +341,7 @@ public:
          2,      // read_write_mode, 0: ReadWrite, 1: Read, 2: Write
          1,      // maxburst
          0,      // align, 0 defaults to alignment of the type
-         1)      // waitrequest, 0: false, 1: true
+         0)      // waitrequest, 0: false, 1: true
 #endif
       TT *c_ptr;   // Output matrix pointer
   int repetitions; // Number of time to read the same matrix to the pipe
