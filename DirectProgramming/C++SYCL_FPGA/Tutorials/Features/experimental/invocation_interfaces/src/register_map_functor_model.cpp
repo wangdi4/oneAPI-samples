@@ -4,6 +4,8 @@
 
 #include "exception_handler.hpp"
 
+using namespace sycl::ext::oneapi::experimental;
+
 using ValueT = int;
 
 // offloaded computation
@@ -14,14 +16,15 @@ ValueT SomethingComplicated(ValueT val) { return (ValueT)(val * (val + 1)); }
 struct FunctorRegisterMapIP {
   // Use the 'register_map' annotation on a kernel argument to specify it to be
   // a register map kernel argument.
-  register_map ValueT *input;
+  annotated_arg<ValueT, decltype(properties{register_map})> input;
   // Without the annotations, kernel arguments will be inferred to be register
   // map kernel arguments if the kernel invocation interface is register mapped,
   // and vise-versa.
   ValueT *output;
   // A kernel with a register map invocation interface can also independently
   // have streaming kernel arguments, when annotated by 'conduit'.
-  conduit size_t n;
+  annotated_arg<size_t, decltype(properties{conduit})> n;
+
   register_map_interface void operator()() const {
     for (int i = 0; i < n; i++) {
       output[i] = SomethingComplicated(input[i]);

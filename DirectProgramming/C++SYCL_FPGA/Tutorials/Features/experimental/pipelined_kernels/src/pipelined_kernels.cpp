@@ -4,13 +4,16 @@
 
 #include "exception_handler.hpp"
 
+using namespace sycl::ext::oneapi::experimental;
+
 using ValueT = int;
 
 // offloaded computation
 ValueT SomethingComplicated(ValueT val) { return (ValueT)(val * (val + 1)); }
 
 struct MyIP {
-  conduit ValueT *input;
+  annotated_arg<ValueT *, decltype(properties{conduit})> input;
+
   streaming_pipelined_interface void operator()() const {
     ValueT temp = *input;
     *input = SomethingComplicated(temp);
