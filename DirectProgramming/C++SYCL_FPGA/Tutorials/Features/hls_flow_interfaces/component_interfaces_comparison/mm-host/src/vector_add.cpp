@@ -3,6 +3,8 @@
 // oneAPI headers
 #include <sycl/sycl.hpp>
 #include <sycl/ext/intel/fpga_extensions.hpp>
+
+#include "annotated_class_util.hpp"
 #include "exception_handler.hpp"
 
 // Buffer locations for MM Host interfaces
@@ -13,6 +15,16 @@ constexpr int kBL3 = 3;
 // Forward declare the kernel name in the global scope. This is an FPGA best
 // practice that reduces name mangling in the optimization reports.
 class SimpleVAdd;
+
+// Create type alias for the type of kernel argument `c_out`, so it can be
+// reused in the annotated memory allocation in the host code
+using karg_c_t = sycl::ext::oneapi::experimental::annotated_arg<
+    int *, decltype(sycl::ext::oneapi::experimental::properties{
+               sycl::ext::intel::experimental::buffer_location<kBL3>,
+               sycl::ext::intel::experimental::dwidth<32>,
+               sycl::ext::intel::experimental::latency<0>,
+               sycl::ext::intel::experimental::read_write_mode_write,
+               sycl::ext::oneapi::experimental::alignment<4>})>;
 
 struct SimpleVAddKernel {
   sycl::ext::oneapi::experimental::annotated_arg<
@@ -31,17 +43,9 @@ struct SimpleVAddKernel {
                  sycl::ext::intel::experimental::latency<0>,
                  sycl::ext::intel::experimental::read_write_mode_read,
                  sycl::ext::oneapi::experimental::alignment<4>})>
-                 
       b_in;
 
-  sycl::ext::oneapi::experimental::annotated_arg<
-      int *, decltype(sycl::ext::oneapi::experimental::properties{
-                 sycl::ext::intel::experimental::buffer_location<kBL3>,
-                 sycl::ext::intel::experimental::dwidth<32>,
-                 sycl::ext::intel::experimental::latency<0>,
-                 sycl::ext::intel::experimental::read_write_mode_write,
-                 sycl::ext::oneapi::experimental::alignment<4>})>
-      c_out;
+  karg_c_t c_out;
 
   int len;
 
@@ -95,11 +99,13 @@ int main() {
         sycl::property_list{
             sycl::ext::intel::experimental::property::usm::buffer_location(
                 kBL2)});
-    int *c = sycl::malloc_shared<int>(
-        count, q,
-        sycl::property_list{
-            sycl::ext::intel::experimental::property::usm::buffer_location(
-                kBL3)});
+
+    // Allocate USM shared memory using the utility function `alloc_annotated`
+    // (defined in "annotated_class_util.hpp"), which takes an annotated_arg
+    // type as the template parameter. This ensures the properties of the
+    // returned memory (e.g. buffer location, alignment) matches with the
+    // annotations on the kernel arguments
+    auto c = fpga_tools::alloc_annotated<karg_c_t>(count, q);
 
     for (int i = 0; i < count; i++) {
       a[i] = i;
