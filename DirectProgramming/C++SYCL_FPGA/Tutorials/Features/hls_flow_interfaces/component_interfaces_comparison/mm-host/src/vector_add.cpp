@@ -102,9 +102,10 @@ int main() {
 
     // Allocate USM shared memory using the utility function `alloc_annotated`
     // (defined in "annotated_class_util.hpp"), which takes an annotated_arg
-    // type as the template parameter. This ensures the properties of the
-    // returned memory (e.g. buffer location, alignment) matches with the
-    // annotations on the kernel arguments
+    // type as the template parameter and returns an instance of such
+    // annotated_arg. This ensures the properties of the returned memory
+    // (e.g. buffer location, alignment) match with the annotations on the
+    // kernel arguments
     auto c = fpga_tools::alloc_annotated<karg_c_t>(count, q);
 
     for (int i = 0; i < count; i++) {
