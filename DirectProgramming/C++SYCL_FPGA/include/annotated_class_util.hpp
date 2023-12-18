@@ -1,8 +1,51 @@
+#ifndef __ANNOTATED_CLASS_UTIL_HPP__
+#define __ANNOTATED_CLASS_UTIL_HPP__
+
 #include <sycl/sycl.hpp>
 
 using namespace sycl::ext::oneapi::experimental;
 
 namespace fpga_tools {
+///////////////////////////////////////////////////////////////////////////////
+// This header provides a utility function: "alloc_annotated", which improves
+// malloc_shared" in allocating host/share memory in the following aspects:
+//   (1) better code brevity
+//   (2) support compile-time type check
+//
+// "annotated_alloc" function takes an annotated_arg type as the only template
+// parameter, and returns an instance of that annotated_arg type. This provides
+// compile-time guarantee that the properties of the allocated memory (e.g.
+// buffer location, alignment) match with the annotations on the kernel arguments
+//
+// To use "alloc_annotated",
+//
+// 1. include header "annotated_class_util.hpp"
+// 2. create a type alias for the "annotated_arg" type, e.g.
+//
+//    using karg_t = sycl::ext::oneapi::experimental::annotated_arg<
+//        int *, decltype(sycl::ext::oneapi::experimental::properties{
+//                        sycl::ext::intel::experimental::buffer_location<1>,
+//                        sycl::ext::intel::experimental::dwidth<32>,
+//                        sycl::ext::intel::experimental::latency<0>,
+//                        sycl::ext::intel::experimental::read_write_mode_write,
+//                        sycl::ext::oneapi::experimental::alignment<4>})>;
+//
+// Specifically, if "-std=c++20" is supported, the type alias declaration above
+// can be symplified as:
+//
+//    using karg_t = sycl::ext::oneapi::experimental::annotated_arg<
+//                  int *, fpga_tools::properties_t<
+//                    sycl::ext::intel::experimental::buffer_location<1>,
+//                    sycl::ext::intel::experimental::dwidth<32>,
+//                    sycl::ext::intel::experimental::latency<0>,
+//                    sycl::ext::intel::experimental::read_write_mode_write,
+//                    sycl::ext::oneapi::experimental::alignment<4>>;
+//
+// 3. in the host code, replace the "malloc_shared" call by:
+//
+//    auto c = fpga_tools::alloc_annotated<karg_t>(count, q);
+//
+///////////////////////////////////////////////////////////////////////////////
 
 #if __cplusplus >= 202002L
 
