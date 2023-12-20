@@ -1,16 +1,26 @@
 #include <sycl/ext/intel/fpga_extensions.hpp>
 #include <sycl/sycl.hpp>
 
-#include "annotated_class_util.hpp"
+// #include "annotated_class_util.hpp"
+#include <sycl/ext/intel/prototype/annotated_class_util.hpp>
 #include "exception_handler.hpp"
 
 constexpr int kBL1 = 1;
 constexpr int kBL2 = 2;
 constexpr int kAlignment = 32;
 
-// Create type alias for the type of kernel argument `z`, so it can be
-// reused in the annotated memory allocation in the host code
-using karg_z_t = sycl::ext::oneapi::experimental::annotated_arg<
+// Create type alias for the type of annotated kernel arguments, so it
+// can be reused in the annotated memory allocation in the host code
+using ann_arg_t1 = sycl::ext::oneapi::experimental::annotated_arg<
+    int *, decltype(sycl::ext::oneapi::experimental::properties{
+      sycl::ext::intel::experimental::buffer_location<kBL1>,
+      sycl::ext::intel::experimental::maxburst<8>,
+      sycl::ext::intel::experimental::dwidth<256>,
+      sycl::ext::oneapi::experimental::alignment<kAlignment>,
+      sycl::ext::intel::experimental::awidth<32>,
+      sycl::ext::intel::experimental::latency<0>})>;
+
+using ann_arg_t2 = sycl::ext::oneapi::experimental::annotated_arg<
     int *, decltype(sycl::ext::oneapi::experimental::properties{
                sycl::ext::intel::experimental::buffer_location<kBL2>,
                sycl::ext::intel::experimental::maxburst<8>,
@@ -20,17 +30,9 @@ using karg_z_t = sycl::ext::oneapi::experimental::annotated_arg<
                sycl::ext::intel::experimental::latency<0>})>;
 
 struct DDRIP {
-  using ParamsBl1 = decltype(sycl::ext::oneapi::experimental::properties{
-      sycl::ext::intel::experimental::buffer_location<kBL1>,
-      sycl::ext::intel::experimental::maxburst<8>,
-      sycl::ext::intel::experimental::dwidth<256>,
-      sycl::ext::oneapi::experimental::alignment<kAlignment>,
-      sycl::ext::intel::experimental::awidth<32>,
-      sycl::ext::intel::experimental::latency<0>});
-
-  sycl::ext::oneapi::experimental::annotated_arg<int *, ParamsBl1> x;
-  sycl::ext::oneapi::experimental::annotated_arg<int *, ParamsBl1> y;
-  karg_z_t z;
+  ann_arg_t1 x;
+  ann_arg_t1 y;
+  ann_arg_t2 z;
   int size;
 
   void operator()() const {
@@ -66,24 +68,15 @@ int main(void) {
     constexpr int kN = 8;
     std::cout << "Elements in vector : " << kN << "\n";
 
-    // Host array must share the same buffer location property as defined in the
-    // kernel. Since we are specifying alignment on the kernel argument, we
-    // need to also specify that to the allocation call by using
-    // aligned_alloc_shared API
-    int *array_a = sycl::aligned_alloc_shared<int>(
-        kAlignment, kN, q,
-        sycl::ext::intel::experimental::property::usm::buffer_location(kBL1));
-    int *array_b = sycl::aligned_alloc_shared<int>(
-        kAlignment, kN, q,
-        sycl::ext::intel::experimental::property::usm::buffer_location(kBL1));
-
     // Allocate USM shared memory using the utility function `alloc_annotated`
     // (defined in "annotated_class_util.hpp"), which takes an annotated_arg
     // type as the template parameter and returns an instance of such
     // annotated_arg. This ensures the properties of the returned memory
-    // (e.g. buffer location, alignment) match with the annotations on the
-    // kernel arguments
-    auto array_c = fpga_tools::alloc_annotated<karg_z_t>(kN, q);
+    // (for example, buffer location and alignment) match with the annotations
+    // on the kernel arguments
+    ann_arg_t1 array_a = fpga_tools::alloc_annotated<ann_arg_t1>(kN, q);
+    ann_arg_t1 array_b = fpga_tools::alloc_annotated<ann_arg_t1>(kN, q);
+    ann_arg_t2 array_c = fpga_tools::alloc_annotated<ann_arg_t2>(kN, q);
 
     assert(array_a);
     assert(array_b);

@@ -4,7 +4,8 @@
 #include <sycl/sycl.hpp>
 #include <sycl/ext/intel/fpga_extensions.hpp>
 
-#include "annotated_class_util.hpp"
+// #include "annotated_class_util.hpp"
+#include <sycl/ext/intel/prototype/annotated_class_util.hpp>
 #include "exception_handler.hpp"
 
 // Buffer locations for MM Host interfaces
@@ -18,34 +19,33 @@ class SimpleVAdd;
 
 // Create type alias for the type of kernel argument `c_out`, so it can be
 // reused in the annotated memory allocation in the host code
-using karg_c_t = sycl::ext::oneapi::experimental::annotated_arg<
+using a_in_t = sycl::ext::oneapi::experimental::annotated_arg<
+      int *, decltype(sycl::ext::oneapi::experimental::properties{
+                 sycl::ext::intel::experimental::buffer_location<kBL1>,
+                 sycl::ext::intel::experimental::dwidth<32>,
+                 sycl::ext::intel::experimental::latency<0>,
+                 sycl::ext::intel::experimental::read_write_mode_read,
+                 sycl::ext::oneapi::experimental::alignment<4>})>;
+
+using b_in_t = sycl::ext::oneapi::experimental::annotated_arg<
+      int *, decltype(sycl::ext::oneapi::experimental::properties{
+                 sycl::ext::intel::experimental::buffer_location<kBL2>,
+                 sycl::ext::intel::experimental::dwidth<32>,
+                 sycl::ext::intel::experimental::latency<0>,
+                 sycl::ext::intel::experimental::read_write_mode_read,
+                 sycl::ext::oneapi::experimental::alignment<4>})>;
+
+using c_out_t = sycl::ext::oneapi::experimental::annotated_arg<
     int *, decltype(sycl::ext::oneapi::experimental::properties{
                sycl::ext::intel::experimental::buffer_location<kBL3>,
                sycl::ext::intel::experimental::dwidth<32>,
                sycl::ext::intel::experimental::latency<0>,
                sycl::ext::intel::experimental::read_write_mode_write,
                sycl::ext::oneapi::experimental::alignment<4>})>;
-
 struct SimpleVAddKernel {
-  sycl::ext::oneapi::experimental::annotated_arg<
-      int *, decltype(sycl::ext::oneapi::experimental::properties{
-                 sycl::ext::intel::experimental::buffer_location<kBL1>,
-                 sycl::ext::intel::experimental::dwidth<32>,
-                 sycl::ext::intel::experimental::latency<0>,
-                 sycl::ext::intel::experimental::read_write_mode_read,
-                 sycl::ext::oneapi::experimental::alignment<4>})>
-      a_in;
-
-  sycl::ext::oneapi::experimental::annotated_arg<
-      int *, decltype(sycl::ext::oneapi::experimental::properties{
-                 sycl::ext::intel::experimental::buffer_location<kBL2>,
-                 sycl::ext::intel::experimental::dwidth<32>,
-                 sycl::ext::intel::experimental::latency<0>,
-                 sycl::ext::intel::experimental::read_write_mode_read,
-                 sycl::ext::oneapi::experimental::alignment<4>})>
-      b_in;
-
-  karg_c_t c_out;
+  a_in_t a_in;
+  b_in_t b_in;
+  c_out_t c_out;
 
   int len;
 
@@ -87,26 +87,15 @@ int main() {
     int count = kVectorSize;  // pass array size by value
 
     // declare arrays and fill them
-    // Create USM shared allocations in the specified buffer_location. 
-    // You can also use host allocations with malloc_host(...) API
-    int *a = sycl::malloc_shared<int>(
-        count, q,
-        sycl::property_list{
-            sycl::ext::intel::experimental::property::usm::buffer_location(
-                kBL1)});
-    int *b = sycl::malloc_shared<int>(
-        count, q,
-        sycl::property_list{
-            sycl::ext::intel::experimental::property::usm::buffer_location(
-                kBL2)});
-
     // Allocate USM shared memory using the utility function `alloc_annotated`
     // (defined in "annotated_class_util.hpp"), which takes an annotated_arg
     // type as the template parameter and returns an instance of such
     // annotated_arg. This ensures the properties of the returned memory
-    // (e.g. buffer location, alignment) match with the annotations on the
-    // kernel arguments
-    auto c = fpga_tools::alloc_annotated<karg_c_t>(count, q);
+    // (for example, buffer location and alignment) match with the annotations
+    // on the kernel arguments
+    a_in_t a = fpga_tools::alloc_annotated<a_in_t>(count, q);
+    b_in_t b = fpga_tools::alloc_annotated<b_in_t>(count, q);
+    c_out_t c = fpga_tools::alloc_annotated<c_out_t>(count, q);
 
     for (int i = 0; i < count; i++) {
       a[i] = i;

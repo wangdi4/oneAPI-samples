@@ -1,7 +1,8 @@
 #include <sycl/ext/intel/fpga_extensions.hpp>
 #include <sycl/sycl.hpp>
 
-#include "annotated_class_util.hpp"
+// #include "annotated_class_util.hpp"
+#include <sycl/ext/intel/prototype/annotated_class_util.hpp>
 #include "exception_handler.hpp"
 
 constexpr int kBL1 = 1;
@@ -9,38 +10,39 @@ constexpr int kBL2 = 2;
 constexpr int kBL3 = 3;
 constexpr int kAlignment = 4;
 
-// Create type alias for the type of kernel argument `z`, so it can be
+// Create type alias for the annotated kernel arguments, so it can be
 // reused in the annotated memory allocation in the host code
-using karg_z_t = sycl::ext::oneapi::experimental::annotated<
+// Each annotated pointer is configured with a unique `buffer_location`,
+// resulting in three unique Avalon memory-mapped host interfaces.
+using arg_x_t= sycl::ext::oneapi::experimental::annotated_arg<
     int *, decltype(sycl::ext::oneapi::experimental::properties{
-               sycl::ext::intel::experimental::buffer_location<kBL3>,
-               sycl::ext::intel::experimental::awidth<32>,
-               sycl::ext::intel::experimental::dwidth<32>,
-               sycl::ext::intel::experimental::latency<1>,
-               sycl::ext::oneapi::experimental::alignment<kAlignment>,
-               sycl::ext::intel::experimental::read_write_mode_write})>;
+        sycl::ext::intel::experimental::buffer_location<kBL1>,
+        sycl::ext::intel::experimental::awidth<32>,
+        sycl::ext::intel::experimental::dwidth<32>,
+        sycl::ext::intel::experimental::latency<1>,
+        sycl::ext::oneapi::experimental::alignment<kAlignment>,
+        sycl::ext::intel::experimental::read_write_mode_read})>;
+using arg_y_t = sycl::ext::oneapi::experimental::annotated_arg<
+    int *, decltype(sycl::ext::oneapi::experimental::properties{
+        sycl::ext::intel::experimental::buffer_location<kBL2>,
+        sycl::ext::intel::experimental::awidth<32>,
+        sycl::ext::intel::experimental::dwidth<32>,
+        sycl::ext::intel::experimental::latency<1>,
+        sycl::ext::oneapi::experimental::alignment<kAlignment>,
+        sycl::ext::intel::experimental::read_write_mode_read})>;
+using arg_z_t = sycl::ext::oneapi::experimental::annotated_arg<
+    int *, decltype(sycl::ext::oneapi::experimental::properties{
+        sycl::ext::intel::experimental::buffer_location<kBL3>,
+        sycl::ext::intel::experimental::awidth<32>,
+        sycl::ext::intel::experimental::dwidth<32>,
+        sycl::ext::intel::experimental::latency<1>,
+        sycl::ext::oneapi::experimental::alignment<kAlignment>,
+        sycl::ext::intel::experimental::read_write_mode_write})>;
 
 struct MultiMMIP {
-  // Each annotated pointer is configured with a unique `buffer_location`,
-  // resulting in three unique Avalon memory-mapped host interfaces.
-  using XProps = decltype(sycl::ext::oneapi::experimental::properties{
-      sycl::ext::intel::experimental::buffer_location<kBL1>,
-      sycl::ext::intel::experimental::awidth<32>,
-      sycl::ext::intel::experimental::dwidth<32>,
-      sycl::ext::intel::experimental::latency<1>,
-      sycl::ext::oneapi::experimental::alignment<kAlignment>,
-      sycl::ext::intel::experimental::read_write_mode_read});
-  using YProps = decltype(sycl::ext::oneapi::experimental::properties{
-      sycl::ext::intel::experimental::buffer_location<kBL2>,
-      sycl::ext::intel::experimental::awidth<32>,
-      sycl::ext::intel::experimental::dwidth<32>,
-      sycl::ext::intel::experimental::latency<1>,
-      sycl::ext::oneapi::experimental::alignment<kAlignment>,
-      sycl::ext::intel::experimental::read_write_mode_read});
-
-  sycl::ext::oneapi::experimental::annotated_arg<int *, XProps> x;
-  sycl::ext::oneapi::experimental::annotated_arg<int *, YProps> y;
-  karg_z_t z;
+  arg_x_t x;
+  arg_y_t y;
+  arg_z_t z;
 
   int size;
 
@@ -76,26 +78,15 @@ int main(void) {
     constexpr int kN = 8;
     std::cout << "Elements in vector : " << kN << "\n";
 
-    // Host array must share the same buffer location property as defined in the
-    // kernel. Since we are specifying alignment on the kernel argument, we
-    // need to also specify that to the allocation call by using
-    // aligned_alloc_shared API
-    int *array_a = sycl::aligned_alloc_shared<int>(
-        kAlignment, kN, q,
-        sycl::ext::intel::experimental::property::usm::buffer_location(kBL1));
-    int *array_b = sycl::aligned_alloc_shared<int>(
-        kAlignment, kN, q,
-        sycl::ext::intel::experimental::property::usm::buffer_location(kBL2));
-
     // Allocate USM shared memory using the utility function `alloc_annotated`
     // (defined in "annotated_class_util.hpp"), which takes an annotated_arg
     // type as the template parameter and returns an instance of such
     // annotated_arg. This ensures the properties of the returned memory
-    // (e.g. buffer location, alignment) match with the annotations on the
-    // kernel arguments
-    auto array_c = fpga_tools::alloc_annotated<karg_z_t>(
-        kAlignment, kN, q,
-        sycl::ext::intel::experimental::property::usm::buffer_location(kBL3));
+    // (for example, buffer location and alignment) match with the annotations
+    // on the kernel arguments
+    arg_x_t array_a = fpga_tools::alloc_annotated<arg_x_t>(kN, q);
+    arg_y_t array_b = fpga_tools::alloc_annotated<arg_y_t>(kN, q);
+    arg_z_t array_c = fpga_tools::alloc_annotated<arg_z_t>(kN, q);
 
     assert(array_a);
     assert(array_b);
