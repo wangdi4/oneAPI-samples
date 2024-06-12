@@ -1,0 +1,61 @@
+{
+  "guid": "4EEE7A9B-7C7A-4A20-B758-ADC4975626FC",
+  "name": "AP Float",
+  "categories": ["Toolkit/oneAPI Direct Programming/DPC++ FPGA/Tutorials/Features"],
+  "description": "An Intel® FPGA tutorial demonstrating how to use the Algorithmic C Arbitrary Precision Floating Point data type (AP Float)",
+  "toolchain": ["dpcpp"],
+  "os": ["linux", "windows"],
+  "targetDevice": ["FPGA"],
+  "builder": ["ide", "cmake"],
+  "languages": [{"cpp":{}}],
+  "ciTests": {
+    "linux": [
+      {
+        "id": "fpga_emu",
+        "steps": [
+          "dpcpp --version",
+          "mkdir build",
+          "cd build",
+          "cmake ..",
+          "make fpga_emu",
+          "./ap_float.fpga_emu"
+        ]
+      },
+      {
+        "id": "report",
+        "steps": [
+          "dpcpp --version",
+          "mkdir build",
+          "cd build",
+          "cmake ..",
+          "make report"
+        ]
+      }
+    ],
+    "windows": [
+      {
+        "id": "fpga_emu",
+        "steps": [
+          "dpcpp --version",
+          "cd ../../..",
+          "mkdir build",
+          "cd build",
+          "cmake -G \"NMake Makefiles\" ../Tutorials/Features/ap_float",
+          "nmake fpga_emu",
+          "ap_float.fpga_emu.exe"
+        ]
+      },
+      {
+        "id": "report",
+        "steps": [
+          "dpcpp --version",
+          "cd ../../..",
+          "mkdir build",
+          "cd build",
+          "cmake -G \"NMake Makefiles\" ../Tutorials/Features/ap_float",
+          "nmake report"
+        ]
+      }
+    ]
+  }
+}
